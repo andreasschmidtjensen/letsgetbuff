@@ -9,6 +9,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { ExerciseDef } from '@letsgetbuff/shared'
 import { config } from './config.js'
+import type { Db } from './db.js'
 
 // ---------------------------------------------------------------------------
 // Guidelines prompt — encodes the program rules so generated exercises conform
@@ -162,17 +163,31 @@ const EXERCISE_TOOL: Anthropic.Tool = {
 // Configuration status
 // ---------------------------------------------------------------------------
 
-/** Actionable message shown when the Anthropic key is missing from the server env. */
+/** Actionable message shown when the Anthropic key is missing. */
 export const MISSING_KEY_MESSAGE =
-  'Claude API key not configured on the server. Set ANTHROPIC_API_KEY in the server environment (the compose `.env`) and restart the container.'
+  'Claude API key not configured. An admin can add it in Settings.'
+
+/**
+ * Resolve the active Anthropic API key: DB row first, env-var fallback.
+ * Never returns the value to clients — internal use only.
+ */
+export function getApiKey(db: Db): string {
+  try {
+    const row = db.prepare(
+      "SELECT value FROM server_config WHERE key = 'anthropic_api_key'"
+    ).get() as { value: string } | undefined
+    if (row?.value) return row.value
+  } catch { /* table not yet migrated — fall through */ }
+  return config.anthropicApiKey
+}
 
 /**
  * Whether the server has an Anthropic API key. Does NOT make a network call and
  * never exposes the key value — just reports presence so the UI can tell
  * "not configured" (503) apart from "the Claude call failed" (502).
  */
-export function isAiConfigured(): boolean {
-  return Boolean(config.anthropicApiKey)
+export function isAiConfigured(db: Db): boolean {
+  return Boolean(getApiKey(db))
 }
 
 // ---------------------------------------------------------------------------
@@ -247,16 +262,18 @@ export function validateExerciseDef(raw: unknown): ExerciseDef {
  * (api.ts) stores it as a pending proposal; a human approves later.
  */
 export async function proposeExercise(
+  db: Db,
   workoutId: 'A' | 'B',
   request: string,
   existingExerciseIds: string[],
 ): Promise<ExerciseDef> {
-  if (!config.anthropicApiKey) {
-    // Defensive — callers should gate on isAiConfigured() and return 503 first.
+  const apiKey = getApiKey(db)
+  if (!apiKey) {
+    // Defensive — callers should gate on isAiConfigured(db) and return 503 first.
     throw new Error(MISSING_KEY_MESSAGE)
   }
 
-  const client = new Anthropic({ apiKey: config.anthropicApiKey })
+  const client = new Anthropic({ apiKey })
 
   const userMessage = `Workout ${workoutId} request: "${request}"
 

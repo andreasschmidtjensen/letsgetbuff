@@ -24,7 +24,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { EMPTY_STATE, SCHEMA_VERSION } from '@letsgetbuff/shared'
 import type { AppState, Plan, Session, ExerciseEntry } from '@letsgetbuff/shared'
 import type { Db } from './db.js'
-import { proposeExercise, validateExerciseDef, isAiConfigured, MISSING_KEY_MESSAGE } from './claude.js'
+import { proposeExercise, validateExerciseDef, isAiConfigured, getApiKey, MISSING_KEY_MESSAGE } from './claude.js'
 import { requirePrivilege, type Privilege } from './auth.js'
 import {
   getOrCreateActiveSession,
@@ -140,7 +140,7 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
   // Reports whether the server has an Anthropic key configured. No key value,
   // no network call. Lets the UI distinguish "not configured" from "call failed".
   app.get('/api/plan/ai-status', async (_req: FastifyRequest, reply: FastifyReply) => {
-    return reply.send({ configured: isAiConfigured() })
+    return reply.send({ configured: isAiConfigured(db) })
   })
 
   // ── GET /api/plan/proposals ─────────────────────────────────────────────────
@@ -163,7 +163,7 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       }
       // Service-not-configured (503) is distinct from a failed Anthropic call (502)
       // so the cause is unambiguous in logs and the UI.
-      if (!isAiConfigured()) {
+      if (!isAiConfigured(db)) {
         return reply.code(503).send({ error: MISSING_KEY_MESSAGE, configured: false })
       }
       const planRow = db.prepare('SELECT json FROM plan WHERE id = 1').get() as { json: string } | undefined
@@ -171,7 +171,7 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       const existingIds = plan ? plan.workouts.flatMap(w => w.exercises.map(e => e.id)) : []
       let exercise
       try {
-        exercise = await proposeExercise(workoutId, userRequest.trim(), existingIds)
+        exercise = await proposeExercise(db, workoutId, userRequest.trim(), existingIds)
       } catch (err) {
         app.log.error({ err }, '[api] Claude proposal failed')
         return reply.code(502).send({ error: String(err) })
@@ -533,6 +533,53 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       `).run(partnerRow.id, JSON.stringify(partnerState), partnerState.schemaVersion ?? SCHEMA_VERSION, now)
 
       return reply.send({ ok: true, partner: partner.username, updatedAt: now })
+    },
+  )
+
+  // ── Phase 18: Admin — Anthropic API key management ───────────────────────────
+
+  // GET /api/admin/config/ai-key → { configured: bool } — never returns the key value
+  app.get(
+    '/api/admin/config/ai-key',
+    { preHandler: requirePrivilege('admin') },
+    async (_req: FastifyRequest, reply: FastifyReply) => {
+      return reply.send({ configured: isAiConfigured(db) })
+    },
+  )
+
+  // PUT /api/admin/config/ai-key — upsert the key into server_config
+  app.put<{ Body: { key: string } }>(
+    '/api/admin/config/ai-key',
+    {
+      preHandler: requirePrivilege('admin'),
+      schema: {
+        body: {
+          type: 'object',
+          required: ['key'],
+          properties: { key: { type: 'string', minLength: 1 } },
+        },
+      },
+    },
+    async (req: FastifyRequest<{ Body: { key: string } }>, reply: FastifyReply) => {
+      const { key } = req.body
+      if (!key?.trim()) return reply.code(400).send({ error: 'key is required' })
+      const now = new Date().toISOString()
+      db.prepare(`
+        INSERT INTO server_config (key, value, updated_at)
+        VALUES ('anthropic_api_key', ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+      `).run(key.trim(), now)
+      return reply.send({ ok: true })
+    },
+  )
+
+  // DELETE /api/admin/config/ai-key — remove DB key; env-var fallback may still apply
+  app.delete(
+    '/api/admin/config/ai-key',
+    { preHandler: requirePrivilege('admin') },
+    async (_req: FastifyRequest, reply: FastifyReply) => {
+      db.prepare("DELETE FROM server_config WHERE key = 'anthropic_api_key'").run()
+      return reply.send({ ok: true, configured: Boolean(getApiKey(db)) })
     },
   )
 }

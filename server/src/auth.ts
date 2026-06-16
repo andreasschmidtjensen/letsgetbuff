@@ -63,7 +63,7 @@ export function ensureUserAndPrivilege(
     if (existing) {
       level = existing.level
     } else {
-      level = priorCount === 0 ? 'admin' : 'user'
+      level = priorCount === 0 ? 'admin' : 'none'
       buffDb
         .prepare('INSERT INTO user_privilege (user_id, level) VALUES (?, ?)')
         .run(id, level)

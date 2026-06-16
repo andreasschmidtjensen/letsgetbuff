@@ -778,6 +778,7 @@ export default function WorkoutView({ username, level }: { username: string; lev
         <StartSessionModal
           partner={partnerCandidate ? { username: partnerCandidate } : null}
           onChoose={(mode, partnerUsername) => createSession(mode, partnerUsername)}
+          onCancel={() => { setShowStartModal(false); createSession('solo') }}
         />
       )}
 

@@ -27,6 +27,26 @@ function activityColor(act: DayActivity): string {
   }
 }
 
+// Returns the next gym day within 14 days that hasn't been logged as done yet.
+function nextGymSession(
+  startDate: string,
+  skippedWeeks: string[],
+  sessions: Record<string, Session>,
+  from: Date,
+): { dateKey: string; date: Date; workout: 'A' | 'B'; programWeek: number } | null {
+  for (let i = 0; i <= 14; i++) {
+    const d = new Date(from)
+    d.setDate(d.getDate() + i)
+    const key = dateKey(d)
+    const pw = computeProgramWeek(startDate, skippedWeeks, d)
+    const activity = scheduleFor(pw)[todayDayName(d)]
+    if ((activity === 'gym-a' || activity === 'gym-b') && !sessions[key]?.done) {
+      return { dateKey: key, date: d, workout: activity === 'gym-a' ? 'A' : 'B', programWeek: pw }
+    }
+  }
+  return null
+}
+
 // Map a logged session's workout type onto the schedule's activity vocabulary
 function sessionActivity(w: Session['workout']): DayActivity {
   switch (w) {
@@ -83,6 +103,8 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
   // What to display for "Today": the logged workout if one exists, else the scheduled activity
   const todayDisplayActivity = todaySession ? sessionActivity(todaySession.workout) : todayActivity
 
+  const nextGym = nextGymSession(state.startDate, state.skippedWeeks, state.sessions, today)
+
   // Viewed week for the schedule grid (0 = current, negative = past)
   const viewMonday = addDays(weekKeyToMonday(currentWeekKey), weekOffset * 7)
   const viewWeekKey = isoWeekKey(viewMonday)
@@ -104,6 +126,29 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
           {isSkipped && <span style={{ color: 'var(--red)', marginLeft: 8 }}>This week skipped</span>}
         </div>
       </div>
+
+      {/* Next gym session */}
+      {nextGym && (
+        <div className="card">
+          <div className="card-title">Next gym session</div>
+          <div className="row gap-8 mb-8" style={{ alignItems: 'baseline' }}>
+            <span style={{ fontSize: 16, fontWeight: 700, color: nextGym.workout === 'A' ? 'var(--accent)' : 'var(--blue)' }}>
+              Workout {nextGym.workout}
+            </span>
+            <span className="muted" style={{ fontSize: 13 }}>· Week {nextGym.programWeek}</span>
+          </div>
+          <div style={{ fontSize: 14, marginBottom: 10 }}>
+            {nextGym.dateKey === todayStr
+              ? 'Today'
+              : nextGym.date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+          </div>
+          {nextGym.dateKey === todayStr && (
+            <button className="btn btn-primary btn-sm" onClick={() => onNavigate('workout')}>
+              Go to workout →
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Today's activity */}
       <div className="card">

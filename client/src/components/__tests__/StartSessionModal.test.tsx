@@ -73,3 +73,16 @@ test('calls onChoose("shared", partner) when "Train with" is clicked', () => {
   expect(onChoose).toHaveBeenCalledTimes(1)
   expect(onChoose).toHaveBeenCalledWith('shared', 'partner')
 })
+
+test('does not render a Cancel button when onCancel is absent', () => {
+  render(<StartSessionModal partner={null} onChoose={() => {}} />)
+  expect(buttonsText().some(t => t.includes('Cancel'))).toBe(false)
+})
+
+test('renders Cancel button and calls onCancel when clicked', () => {
+  const onCancel = vi.fn()
+  render(<StartSessionModal partner={null} onChoose={() => {}} onCancel={onCancel} />)
+  expect(buttonsText().some(t => t.includes('Cancel'))).toBe(true)
+  clickButtonContaining('Cancel')
+  expect(onCancel).toHaveBeenCalledTimes(1)
+})

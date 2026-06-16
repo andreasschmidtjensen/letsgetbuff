@@ -21,7 +21,7 @@ export type Db = DatabaseSync
 
 // ---- Migration ladder -------------------------------------------------------
 
-const CURRENT_DB_VERSION = 4
+const CURRENT_DB_VERSION = 5
 
 type Migration = (db: DatabaseSync) => void
 
@@ -116,6 +116,16 @@ const MIGRATIONS: Record<number, Migration> = {
         scope_date          TEXT,
         scope_workout       TEXT,
         updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `)
+  },
+  5: (db) => {
+    // Phase 18: server-side config store (Anthropic API key, admin-editable).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS server_config (
+        key        TEXT PRIMARY KEY,
+        value      TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `)
   },

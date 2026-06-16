@@ -44,6 +44,8 @@
   padding: 12px 16px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
 }
 
 .app-title {

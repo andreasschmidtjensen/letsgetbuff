@@ -12,9 +12,10 @@ import { useEffect, useRef } from 'react'
 interface Props {
   partner?: { username: string } | null
   onChoose: (mode: 'solo' | 'shared', partnerUsername?: string) => void
+  onCancel?: () => void
 }
 
-export default function StartSessionModal({ partner, onChoose }: Props) {
+export default function StartSessionModal({ partner, onChoose, onCancel }: Props) {
   const firstBtn = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -69,6 +70,15 @@ export default function StartSessionModal({ partner, onChoose }: Props) {
               onClick={() => onChoose('shared', partner.username)}
             >
               👥 Train with {partner.username}
+            </button>
+          )}
+          {onCancel && (
+            <button
+              className="btn btn-secondary"
+              style={{ padding: 14, fontSize: 16 }}
+              onClick={onCancel}
+            >
+              Cancel
             </button>
           )}
         </div>
