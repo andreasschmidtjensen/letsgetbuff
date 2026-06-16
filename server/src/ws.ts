@@ -1,21 +1,24 @@
 /**
- * Phase 6 — Live shared exercise reordering via WebSocket
+ * Phase 6 / Phase 12 — Live shared exercise reordering via WebSocket.
  *
- * Single shared channel (no room abstraction). Authenticated via JWT in the
- * session cookie using Node built-in crypto (HS256 — matches @fastify/jwt default).
+ * Connections are now scoped to a **session** (Phase 12) instead of one fixed
+ * global room. The WS URL carries `?sessionId=<n>`; the order version-guard and
+ * the presence Map are keyed per session. The message schema and the version-guard
+ * last-write-wins contract are unchanged from Phase 6 — only the scope changed.
  *
- * Protocol:
+ * Authenticated via the session-cookie JWT (HS256) using Node built-in crypto.
+ *
+ * Protocol (unchanged):
  *   Client -> Server:
  *     { type: 'reorder',  order: string[], basedOnVersion: number, date: string, workoutType: string }
  *     { type: 'presence', exerciseId: string }
- *
- *   Server -> Client (broadcast):
+ *   Server -> Client:
  *     { type: 'order',    order: string[], version: number }
  *     { type: 'presence', user: string, exerciseId: string | null }
  *
- * Reset rule: order is scoped to (date, workoutType). A new scope triggers a
- * reset to plan order before applying the reorder. Configurable as a user
- * setting in a future phase.
+ * Reset rule: each session owns its own live_order row, seeded to plan order at
+ * version 0 when the session is created — so "new scope = new session" already
+ * starts from plan order (handled in sessions.ts).
  */
 
 import { IncomingMessage } from 'node:http'
@@ -23,20 +26,15 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { WebSocketServer, WebSocket } from 'ws'
 import cookie from 'cookie'
 import type { DatabaseSync } from 'node:sqlite'
-import { getPlan } from '@letsgetbuff/shared'
 import { config } from './config.js'
+import { liveOrderForSession, setLiveOrderForSession, isParticipant } from './sessions.js'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface AuthedClient extends WebSocket {
   username: string
-}
-
-interface LiveOrderRow {
-  exercise_order_json: string
-  version: number
-  scope_date: string | null
-  scope_workout: string | null
+  userId: number
+  sessionId: number
 }
 
 interface JwtPayload {
@@ -85,74 +83,45 @@ function verifySessionCookie(rawCookies: string | undefined): JwtPayload | null 
   return { sub, username }
 }
 
-// ── DB helpers ────────────────────────────────────────────────────────────────
-
-function ensureScopeColumns(db: DatabaseSync): void {
-  try { db.exec('ALTER TABLE live_order ADD COLUMN scope_date    TEXT') } catch { /* exists */ }
-  try { db.exec('ALTER TABLE live_order ADD COLUMN scope_workout TEXT') } catch { /* exists */ }
-}
-
-function getLiveOrder(db: DatabaseSync): LiveOrderRow {
-  const row = db.prepare(
-    'SELECT exercise_order_json, version, scope_date, scope_workout FROM live_order WHERE id = 1'
-  ).get() as unknown as LiveOrderRow
-  return row
-}
-
-function planOrder(): string[] {
-  const plan = getPlan()
-  return plan.workouts.flatMap(w => w.exercises.map(e => e.id))
-}
-
-function resetOrder(db: DatabaseSync, date: string, workoutType: string): LiveOrderRow {
-  const order = planOrder()
-  const now = new Date().toISOString()
-  db.prepare(`
-    UPDATE live_order
-    SET exercise_order_json = ?, version = 0, scope_date = ?, scope_workout = ?, updated_at = ?
-    WHERE id = 1
-  `).run(JSON.stringify(order), date, workoutType, now)
-  return { exercise_order_json: JSON.stringify(order), version: 0, scope_date: date, scope_workout: workoutType }
-}
-
-function persistOrder(db: DatabaseSync, order: string[], version: number, date: string, workoutType: string): void {
-  db.prepare(`
-    UPDATE live_order
-    SET exercise_order_json = ?, version = ?, scope_date = ?, scope_workout = ?, updated_at = ?
-    WHERE id = 1
-  `).run(JSON.stringify(order), version, date, workoutType, new Date().toISOString())
-}
-
-// ── Broadcast ─────────────────────────────────────────────────────────────────
-
-function broadcast(clients: Set<WebSocket>, msg: unknown, skip?: WebSocket): void {
-  const text = JSON.stringify(msg)
-  for (const c of clients) {
-    if (c !== skip && c.readyState === WebSocket.OPEN) c.send(text)
-  }
-}
-
 // ── WebSocket server factory ──────────────────────────────────────────────────
 
 export function createWsServer(db: DatabaseSync): WebSocketServer {
-  ensureScopeColumns(db)
-
   const wss = new WebSocketServer({ noServer: true })
-  const presence = new Map<string, string>()  // username -> exerciseId
+  // sessionId -> (username -> exerciseId). Presence is in-memory only, per session.
+  const presenceBySession = new Map<number, Map<string, string>>()
+
+  function presenceFor(sessionId: number): Map<string, string> {
+    let m = presenceBySession.get(sessionId)
+    if (!m) { m = new Map(); presenceBySession.set(sessionId, m) }
+    return m
+  }
+
+  function broadcastToSession(sessionId: number, msg: unknown, skip?: WebSocket): void {
+    const text = JSON.stringify(msg)
+    for (const c of wss.clients) {
+      const ac = c as AuthedClient
+      if (ac.sessionId === sessionId && c !== skip && c.readyState === WebSocket.OPEN) c.send(text)
+    }
+  }
 
   wss.on('connection', (rawWs: WebSocket) => {
     const ws = rawWs as AuthedClient
 
-    // Send current order on connect
-    const row = getLiveOrder(db)
-    ws.send(JSON.stringify({
-      type: 'order',
-      order: JSON.parse(row.exercise_order_json) as string[],
-      version: row.version,
-    }))
+    // sessionId/userId/username are set on the socket by the upgrade handler.
+    // Guard: only participants of the session may join.
+    if (!ws.sessionId || !isParticipant(db, ws.sessionId, ws.userId)) {
+      ws.close()
+      return
+    }
 
-    // Send current presence snapshot
-    for (const [user, exerciseId] of presence.entries()) {
+    // Send current order for this session on connect
+    const live = liveOrderForSession(db, ws.sessionId)
+    if (live) {
+      ws.send(JSON.stringify({ type: 'order', order: live.order, version: live.version }))
+    }
+
+    // Send current presence snapshot for this session
+    for (const [user, exerciseId] of presenceFor(ws.sessionId).entries()) {
       if (user !== ws.username) {
         ws.send(JSON.stringify({ type: 'presence', user, exerciseId }))
       }
@@ -165,44 +134,33 @@ export function createWsServer(db: DatabaseSync): WebSocketServer {
       if (msg['type'] === 'reorder') {
         const order = msg['order'] as string[]
         const basedOnVersion = msg['basedOnVersion'] as number
-        const date = msg['date'] as string
-        const workoutType = msg['workoutType'] as string
         if (!Array.isArray(order) || typeof basedOnVersion !== 'number') return
 
-        let current = getLiveOrder(db)
-
-        // Reset if scope changed
-        if (current.scope_date !== date || current.scope_workout !== workoutType) {
-          current = resetOrder(db, date, workoutType)
-        }
-
-        if (basedOnVersion !== current.version) {
-          // Stale — snap sender back
-          ws.send(JSON.stringify({
-            type: 'order',
-            order: JSON.parse(current.exercise_order_json) as string[],
-            version: current.version,
-          }))
+        const result = setLiveOrderForSession(db, ws.sessionId, order, basedOnVersion)
+        if (!result.ok) {
+          // Stale — snap sender back to the session's current order
+          ws.send(JSON.stringify({ type: 'order', order: result.current.order, version: result.current.version }))
           return
         }
-
-        const newVersion = current.version + 1
-        persistOrder(db, order, newVersion, date, workoutType)
-        const out = { type: 'order', order, version: newVersion }
+        const out = { type: 'order', order: result.order, version: result.version }
         ws.send(JSON.stringify(out))
-        broadcast(wss.clients, out, ws)
+        broadcastToSession(ws.sessionId, out, ws)
 
       } else if (msg['type'] === 'presence') {
         const exerciseId = msg['exerciseId'] as string
         if (typeof exerciseId !== 'string') return
-        presence.set(ws.username, exerciseId)
-        broadcast(wss.clients, { type: 'presence', user: ws.username, exerciseId }, ws)
+        presenceFor(ws.sessionId).set(ws.username, exerciseId)
+        broadcastToSession(ws.sessionId, { type: 'presence', user: ws.username, exerciseId }, ws)
       }
     })
 
     ws.on('close', () => {
-      presence.delete(ws.username)
-      broadcast(wss.clients, { type: 'presence', user: ws.username, exerciseId: null })
+      const presence = presenceBySession.get(ws.sessionId)
+      if (presence) {
+        presence.delete(ws.username)
+        if (presence.size === 0) presenceBySession.delete(ws.sessionId)
+      }
+      broadcastToSession(ws.sessionId, { type: 'presence', user: ws.username, exerciseId: null })
     })
   })
 

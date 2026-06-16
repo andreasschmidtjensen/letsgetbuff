@@ -21,7 +21,7 @@ export type Db = DatabaseSync
 
 // ---- Migration ladder -------------------------------------------------------
 
-const CURRENT_DB_VERSION = 3
+const CURRENT_DB_VERSION = 4
 
 type Migration = (db: DatabaseSync) => void
 
@@ -83,6 +83,42 @@ const MIGRATIONS: Record<number, Migration> = {
       );
     `)
   },
+  4: (db) => {
+    // Phase 12: real training-session entity (supersedes the single fixed live_order room).
+    // A session links 1–2 of the two users, has a lifecycle, and owns the live order.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS session (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        scope_date  TEXT NOT NULL,
+        workout     TEXT NOT NULL,
+        mode        TEXT NOT NULL DEFAULT 'solo'   CHECK (mode IN ('solo','shared')),
+        status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','ended')),
+        created_by  INTEGER NOT NULL REFERENCES users(id),
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        ended_at    TEXT
+      );
+      CREATE TABLE IF NOT EXISTS session_participant (
+        session_id  INTEGER NOT NULL REFERENCES session(id),
+        user_id     INTEGER NOT NULL REFERENCES users(id),
+        joined_at   TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (session_id, user_id)
+      );
+    `)
+    // live_order becomes session-scoped: one row per session_id (was the id=1 singleton).
+    // Back-compat: preserve any legacy row under live_order_legacy; the session-aware seam
+    // (sessions.ts) never reads it.
+    db.exec('ALTER TABLE live_order RENAME TO live_order_legacy')
+    db.exec(`
+      CREATE TABLE live_order (
+        session_id          INTEGER PRIMARY KEY REFERENCES session(id),
+        exercise_order_json TEXT NOT NULL,
+        version             INTEGER NOT NULL DEFAULT 0,
+        scope_date          TEXT,
+        scope_workout       TEXT,
+        updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `)
+  },
 }
 
 function getDbVersion(db: DatabaseSync): number {
@@ -127,17 +163,6 @@ function seedPlan(db: DatabaseSync): void {
   console.log('[db] Seeded plan (version', plan.version + ')')
 }
 
-function seedLiveOrder(db: DatabaseSync): void {
-  const existing = db.prepare('SELECT id FROM live_order WHERE id = 1').get()
-  if (existing) return
-  const plan = getPlan()
-  const allIds = plan.workouts.flatMap((w) => w.exercises.map((e) => e.id))
-  db.prepare(
-    'INSERT INTO live_order (id, exercise_order_json, version) VALUES (?, ?, 0)',
-  ).run(1, JSON.stringify(allIds))
-  console.log('[db] Seeded live_order with', allIds.length, 'ids')
-}
-
 // ---- Open -------------------------------------------------------------------
 
 export function openDb(): Db {
@@ -146,7 +171,8 @@ export function openDb(): Db {
   db.exec('PRAGMA foreign_keys = ON')
   runMigrations(db)
   seedPlan(db)
-  seedLiveOrder(db)
+  // live_order is session-scoped (Phase 12) and seeded per session on creation —
+  // no global row to seed here.
   console.log('[db] Ready at', config.buffDbPath)
   return db
 }

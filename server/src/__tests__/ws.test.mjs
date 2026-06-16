@@ -1,15 +1,19 @@
 /**
- * Phase 6 — WebSocket live reorder tests
+ * Phase 6 / Phase 12 — WebSocket live reorder tests (session-scoped).
  *
- * Race-condition fix: `connect()` installs a message-queue BEFORE the 'open'
- * event fires, so the server's instant init message is never lost.
+ * The mini-server mirrors ws.ts: each connection carries `?sessionId=<n>`, and the
+ * live order + version-guard + broadcast are scoped per session. Reset rule: a
+ * session's order is seeded to plan order at version 0 on first use.
+ *
+ * Race-condition fix: connect() installs a message queue BEFORE 'open' fires so
+ * the server's instant init message is never lost.
  *
  * Tests:
  *  1. Version-guard accept: valid version bumps order
  *  2. Version-guard reject: stale basedOnVersion snaps back
- *  3. Broadcast fan-out: reorder from A reaches B
- *  4. Reconnect resync: new connection receives current order
- *  5. Scope reset: new date+workoutType resets to plan order then applies
+ *  3. Broadcast fan-out: reorder from A reaches B (same session)
+ *  4. Reconnect resync: new connection to the session receives current order
+ *  5. Session isolation: a second session is independent (starts from plan order)
  */
 
 import { test } from 'node:test'
@@ -22,40 +26,35 @@ import { WebSocketServer, WebSocket } from 'ws'
 const SECRET = 'test-ws-secret'
 const PLAN_ORDER = ['squat', 'press', 'row', 'deadlift']
 
-// ── DB helpers ────────────────────────────────────────────────────────────────
+// ── DB helpers (session-scoped live_order) ──────────────────────────────────────
 
 function makeDb() {
   const db = new DatabaseSync(':memory:')
-  db.exec([
-    'CREATE TABLE live_order (',
-    '  id INTEGER PRIMARY KEY CHECK (id=1),',
-    '  exercise_order_json TEXT NOT NULL,',
-    '  version INTEGER NOT NULL DEFAULT 0,',
-    "  updated_at TEXT NOT NULL DEFAULT (datetime('now')),",
-    '  scope_date TEXT,',
-    '  scope_workout TEXT',
-    ');',
-    'INSERT INTO live_order (id, exercise_order_json, version)',
-    "VALUES (1, '" + JSON.stringify(PLAN_ORDER) + "', 0);",
-  ].join('\n'))
+  db.exec(`
+    CREATE TABLE live_order (
+      session_id          INTEGER PRIMARY KEY,
+      exercise_order_json TEXT NOT NULL,
+      version             INTEGER NOT NULL DEFAULT 0,
+      scope_date          TEXT,
+      scope_workout       TEXT,
+      updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `)
   return db
 }
 
-function getLiveOrder(db) {
-  return db.prepare('SELECT * FROM live_order WHERE id=1').get()
+function getLiveOrder(db, sessionId) {
+  // Self-heal: seed plan order at v0 (mirrors sessions.ts seedLiveOrder)
+  db.prepare(
+    'INSERT INTO live_order (session_id, exercise_order_json, version) VALUES (?, ?, 0) ON CONFLICT (session_id) DO NOTHING'
+  ).run(sessionId, JSON.stringify(PLAN_ORDER))
+  return db.prepare('SELECT * FROM live_order WHERE session_id = ?').get(sessionId)
 }
 
-function resetOrder(db, date, workoutType) {
+function persistOrder(db, sessionId, order, version) {
   db.prepare(
-    "UPDATE live_order SET exercise_order_json=?, version=0, scope_date=?, scope_workout=?, updated_at=datetime('now') WHERE id=1"
-  ).run(JSON.stringify(PLAN_ORDER), date, workoutType)
-  return getLiveOrder(db)
-}
-
-function persistOrder(db, order, version, date, workoutType) {
-  db.prepare(
-    "UPDATE live_order SET exercise_order_json=?, version=?, scope_date=?, scope_workout=?, updated_at=datetime('now') WHERE id=1"
-  ).run(JSON.stringify(order), version, date, workoutType)
+    "UPDATE live_order SET exercise_order_json=?, version=?, updated_at=datetime('now') WHERE session_id=?"
+  ).run(JSON.stringify(order), version, sessionId)
 }
 
 // ── JWT helpers ───────────────────────────────────────────────────────────────
@@ -90,7 +89,12 @@ function parseCookies(header) {
   return out
 }
 
-// ── Mini WS server ────────────────────────────────────────────────────────────
+function sessionIdFromUrl(url) {
+  const u = new URL(url, 'http://localhost')
+  return Number(u.searchParams.get('sessionId'))
+}
+
+// ── Mini WS server (session-scoped) ─────────────────────────────────────────────
 
 function makeWss(db) {
   const wss = new WebSocketServer({ noServer: true })
@@ -98,8 +102,9 @@ function makeWss(db) {
     const cookies = parseCookies(reqObj.headers.cookie)
     const payload = cookies.session ? verifyJwt(cookies.session) : null
     ws.username = payload ? payload.username : 'unknown'
+    ws.sessionId = sessionIdFromUrl(reqObj.url)
 
-    const row = getLiveOrder(db)
+    const row = getLiveOrder(db, ws.sessionId)
     ws.send(JSON.stringify({ type: 'order', order: JSON.parse(row.exercise_order_json), version: row.version }))
 
     ws.on('message', raw => {
@@ -107,20 +112,17 @@ function makeWss(db) {
       try { msg = JSON.parse(raw.toString()) } catch { return }
       if (msg.type !== 'reorder') return
 
-      let cur = getLiveOrder(db)
-      if (cur.scope_date !== msg.date || cur.scope_workout !== msg.workoutType) {
-        cur = resetOrder(db, msg.date, msg.workoutType)
-      }
+      const cur = getLiveOrder(db, ws.sessionId)
       if (msg.basedOnVersion !== cur.version) {
         ws.send(JSON.stringify({ type: 'order', order: JSON.parse(cur.exercise_order_json), version: cur.version }))
         return
       }
       const newVer = cur.version + 1
-      persistOrder(db, msg.order, newVer, msg.date, msg.workoutType)
+      persistOrder(db, ws.sessionId, msg.order, newVer)
       const out = JSON.stringify({ type: 'order', order: msg.order, version: newVer })
       ws.send(out)
       for (const c of wss.clients) {
-        if (c !== ws && c.readyState === WebSocket.OPEN) c.send(out)
+        if (c !== ws && c.sessionId === ws.sessionId && c.readyState === WebSocket.OPEN) c.send(out)
       }
     })
   })
@@ -148,12 +150,10 @@ function stopServer({ server, wss }) {
 }
 
 // FIX: Buffer messages from the moment the WebSocket is created.
-// The server sends an init message immediately on 'connection', which fires
-// before the client emits 'open'. Without buffering, nextMsg() misses it.
-function connect(port, username) {
+function connect(port, username, sessionId = 1) {
   return new Promise((res, rej) => {
     const token = makeJwt({ sub: 1, username, exp: Math.floor(Date.now() / 1000) + 3600 })
-    const ws = new WebSocket('ws://127.0.0.1:' + port, { headers: { cookie: 'session=' + token } })
+    const ws = new WebSocket('ws://127.0.0.1:' + port + '/ws?sessionId=' + sessionId, { headers: { cookie: 'session=' + token } })
     ws._queue = []
     ws._waiters = []
     ws.on('message', d => {
@@ -181,7 +181,7 @@ test('1. Version-guard accept: valid version bumps order', async () => {
   const db = makeDb()
   const ctx = await startServer(db)
   try {
-    const ws = await connect(ctx.port, 'jacob')
+    const ws = await connect(ctx.port, 'jacob', 1)
     const init = await nextMsg(ws)
     assert.equal(init.type, 'order')
     assert.equal(init.version, 0)
@@ -193,7 +193,7 @@ test('1. Version-guard accept: valid version bumps order', async () => {
     assert.equal(reply.type, 'order')
     assert.equal(reply.version, 1)
     assert.deepEqual(reply.order, newOrder)
-    assert.equal(getLiveOrder(db).version, 1)
+    assert.equal(getLiveOrder(db, 1).version, 1)
     ws.terminate()
   } finally { await stopServer(ctx) }
 })
@@ -202,7 +202,7 @@ test('2. Version-guard reject: stale basedOnVersion snaps back', async () => {
   const db = makeDb()
   const ctx = await startServer(db)
   try {
-    const ws = await connect(ctx.port, 'jacob')
+    const ws = await connect(ctx.port, 'jacob', 1)
     await nextMsg(ws)
     ws.send(JSON.stringify({ type: 'reorder', order: ['press', 'squat', 'row', 'deadlift'], basedOnVersion: 0, date: '2026-06-14', workoutType: 'A' }))
     const v1 = await nextMsg(ws)
@@ -212,17 +212,17 @@ test('2. Version-guard reject: stale basedOnVersion snaps back', async () => {
     const snap = await nextMsg(ws)
     assert.equal(snap.version, 1)
     assert.deepEqual(snap.order, ['press', 'squat', 'row', 'deadlift'])
-    assert.equal(getLiveOrder(db).version, 1)
+    assert.equal(getLiveOrder(db, 1).version, 1)
     ws.terminate()
   } finally { await stopServer(ctx) }
 })
 
-test('3. Broadcast fan-out: reorder from A reaches B', async () => {
+test('3. Broadcast fan-out: reorder from A reaches B (same session)', async () => {
   const db = makeDb()
   const ctx = await startServer(db)
   try {
-    const wsA = await connect(ctx.port, 'jacob')
-    const wsB = await connect(ctx.port, 'partner')
+    const wsA = await connect(ctx.port, 'jacob', 1)
+    const wsB = await connect(ctx.port, 'partner', 1)
     await nextMsg(wsA)
     await nextMsg(wsB)
 
@@ -241,7 +241,7 @@ test('4. Reconnect resync: new connection receives current order', async () => {
   const db = makeDb()
   const ctx = await startServer(db)
   try {
-    const ws1 = await connect(ctx.port, 'jacob')
+    const ws1 = await connect(ctx.port, 'jacob', 1)
     await nextMsg(ws1)
     const finalOrder = ['row', 'deadlift', 'press', 'squat']
     ws1.send(JSON.stringify({ type: 'reorder', order: finalOrder, basedOnVersion: 0, date: '2026-06-14', workoutType: 'A' }))
@@ -249,7 +249,7 @@ test('4. Reconnect resync: new connection receives current order', async () => {
     ws1.terminate()
     await new Promise(r => setTimeout(r, 50))
 
-    const ws2 = await connect(ctx.port, 'jacob')
+    const ws2 = await connect(ctx.port, 'jacob', 1)
     const init = await nextMsg(ws2)
     assert.equal(init.version, 1)
     assert.deepEqual(init.order, finalOrder)
@@ -257,21 +257,27 @@ test('4. Reconnect resync: new connection receives current order', async () => {
   } finally { await stopServer(ctx) }
 })
 
-test('5. Scope reset: new date triggers reset to plan order then applies', async () => {
+test('5. Session isolation: a second session is independent (plan order)', async () => {
   const db = makeDb()
   const ctx = await startServer(db)
   try {
-    const ws = await connect(ctx.port, 'jacob')
-    await nextMsg(ws)
-    ws.send(JSON.stringify({ type: 'reorder', order: ['press', 'squat', 'row', 'deadlift'], basedOnVersion: 0, date: '2026-06-14', workoutType: 'A' }))
-    await nextMsg(ws)
+    // Session 1: reorder to v1
+    const ws1 = await connect(ctx.port, 'jacob', 1)
+    await nextMsg(ws1)
+    const s1Order = ['deadlift', 'row', 'squat', 'press']
+    ws1.send(JSON.stringify({ type: 'reorder', order: s1Order, basedOnVersion: 0, date: '2026-06-14', workoutType: 'A' }))
+    const s1Reply = await nextMsg(ws1)
+    assert.equal(s1Reply.version, 1)
 
-    const dayTwoOrder = ['deadlift', 'row', 'squat', 'press']
-    ws.send(JSON.stringify({ type: 'reorder', order: dayTwoOrder, basedOnVersion: 0, date: '2026-06-15', workoutType: 'A' }))
-    const d2 = await nextMsg(ws)
-    assert.equal(d2.version, 1)
-    assert.deepEqual(d2.order, dayTwoOrder)
-    assert.equal(getLiveOrder(db).scope_date, '2026-06-15')
-    ws.terminate()
+    // Session 2: a different session — still plan order at v0, untouched by session 1
+    const ws2 = await connect(ctx.port, 'jacob', 2)
+    const s2Init = await nextMsg(ws2)
+    assert.equal(s2Init.version, 0)
+    assert.deepEqual(s2Init.order, PLAN_ORDER)
+
+    // Session 1 remains independent
+    assert.equal(getLiveOrder(db, 1).version, 1)
+    assert.equal(getLiveOrder(db, 2).version, 0)
+    ws1.terminate(); ws2.terminate()
   } finally { await stopServer(ctx) }
 })

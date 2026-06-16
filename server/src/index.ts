@@ -42,20 +42,9 @@ async function start() {
 
   registerApiRoutes(app, db)
 
-  app.get('/api/live-order', async (_req: any, reply: any) => {
-    const row = db.prepare(
-      'SELECT exercise_order_json, version, scope_date, scope_workout FROM live_order WHERE id = 1'
-    ).get() as { exercise_order_json: string; version: number; scope_date: string | null; scope_workout: string | null } | undefined
-    if (!row) return reply.code(404).send({ error: 'No live order' })
-    return reply.send({
-      order: JSON.parse(row.exercise_order_json) as string[],
-      version: row.version,
-      scopeDate: row.scope_date,
-      scopeWorkout: row.scope_workout,
-    })
-  })
+  // Live order is now session-scoped — see GET /api/session/:id/live-order (api.ts).
 
-  app.get('/api/health', async () => ({ ok: true, version: 11 }))
+  app.get('/api/health', async () => ({ ok: true, version: 12 }))
 
   if (!config.isDev) {
     const staticDir = path.isAbsolute(config.staticDir)
@@ -69,14 +58,24 @@ async function start() {
   console.log('[server] Listening on port', config.port)
 
   app.server.on('upgrade', (req: import('http').IncomingMessage, socket: import('net').Socket, head: Buffer) => {
-    if (req.url !== '/ws') { socket.destroy(); return }
+    const url = new URL(req.url ?? '', 'http://localhost')
+    if (url.pathname !== '/ws') { socket.destroy(); return }
+    const sessionId = Number(url.searchParams.get('sessionId'))
+    if (!Number.isInteger(sessionId) || sessionId <= 0) {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n')
+      socket.destroy()
+      return
+    }
     const payload = authenticateUpgrade(req, (code, msg) => {
       socket.write('HTTP/1.1 ' + code + ' ' + msg + '\r\n\r\n')
       socket.destroy()
     })
     if (!payload) return
     wss.handleUpgrade(req, socket, head, (ws) => {
-      ;(ws as AuthedClient).username = payload.username
+      const client = ws as AuthedClient
+      client.username = payload.username
+      client.userId = payload.sub
+      client.sessionId = sessionId
       wss.emit('connection', ws, req)
     })
   })
