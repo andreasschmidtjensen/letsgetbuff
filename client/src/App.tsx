@@ -71,7 +71,7 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
       <main className="app-main">
         {tab === 'home'      && <HomeView onNavigate={setTab} />}
         {tab === 'workout'   && <WorkoutView username={username} level={level} />}
-        {tab === 'history'   && <HistoryView />}
+        {tab === 'history'   && <HistoryView username={username} />}
         {tab === 'metrics'   && <MetricsView />}
         {tab === 'milestones'&& <MilestonesView />}
         {tab === 'settings'  && <SettingsView onLogout={onLogout} level={level} />}

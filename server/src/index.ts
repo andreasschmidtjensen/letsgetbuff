@@ -44,7 +44,7 @@ async function start() {
 
   // Live order is now session-scoped — see GET /api/session/:id/live-order (api.ts).
 
-  app.get('/api/health', async () => ({ ok: true, version: 16 }))
+  app.get('/api/health', async () => ({ ok: true, version: 17 }))
 
   if (!config.isDev) {
     const staticDir = path.isAbsolute(config.staticDir)

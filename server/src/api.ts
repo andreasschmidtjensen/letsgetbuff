@@ -15,6 +15,9 @@
  * Phase 16: proxy input
  *   PUT  /api/proxy-log            → write an exercise entry into the partner's state
  *                                    (caller must be in an active shared session)
+ *
+ * Phase 17: history charts
+ *   GET  /api/partner-history      → partner's sessions blob for chart overlay
  */
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
@@ -405,6 +408,41 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       return reply.send(live)
     },
   )
+
+  // ── Phase 17: Partner history (chart overlay) ───────────────────────────────
+  //
+  // GET /api/partner-history
+  //   Returns the other user's sessions blob so the client can overlay their
+  //   lift data on the History charts.  Only sessions are shared (no metrics or
+  //   milestones).  "Partner" = the other privileged (user/admin) account.
+  //
+  app.get('/api/partner-history', async (req: FastifyRequest, reply: FastifyReply) => {
+    const { username } = authedUser(req)
+    const partnerRow = db.prepare(`
+      SELECT u.cwa_username AS username, u.id AS id
+      FROM users u
+      LEFT JOIN user_privilege p ON p.user_id = u.id
+      WHERE u.cwa_username != ?
+        AND COALESCE(p.level, 'user') IN ('user', 'admin')
+      ORDER BY u.created_at ASC
+      LIMIT 1
+    `).get(username) as { username: string; id: number } | undefined
+
+    if (!partnerRow) return reply.send({ partnerUsername: null, sessions: {} })
+
+    const stateRow = db
+      .prepare('SELECT json FROM app_state WHERE user_id = ?')
+      .get(partnerRow.id) as { json: string } | undefined
+
+    if (!stateRow) return reply.send({ partnerUsername: partnerRow.username, sessions: {} })
+
+    try {
+      const state = JSON.parse(stateRow.json) as AppState
+      return reply.send({ partnerUsername: partnerRow.username, sessions: state.sessions ?? {} })
+    } catch {
+      return reply.send({ partnerUsername: partnerRow.username, sessions: {} })
+    }
+  })
 
   // ── Phase 16: Proxy input ────────────────────────────────────────────────────
   //
