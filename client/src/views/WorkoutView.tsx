@@ -28,6 +28,10 @@ import { suggestNextWeight, repTargetFor, repBandFor } from '@letsgetbuff/shared
 import { ExerciseEntry, SetEntry, Session } from '@letsgetbuff/shared'
 import type { Privilege } from '@letsgetbuff/shared'
 
+const MUTE_KEY = 'letsgetbuff-mute'
+const REST_SECS_KEY = 'letsgetbuff-rest-secs'
+const REST_SECS_DEFAULT = 90
+
 function beep(ctx: AudioContext, freq = 880, duration = 0.12, vol = 0.4) {
   const osc = ctx.createOscillator()
   const gain = ctx.createGain()
@@ -45,25 +49,41 @@ function playDoneSound(ctx: AudioContext) {
   setTimeout(() => beep(ctx, 1100, 0.18, 0.3), 120)
 }
 
+function SessionTimer({ startedAt }: { startedAt: number }) {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000)
+    return () => clearInterval(id)
+  }, [startedAt])
+  const mins = Math.floor(elapsed / 60)
+  const secs = elapsed % 60
+  return (
+    <span className="muted" style={{ fontSize: 12 }} aria-live="off" aria-label={`Session time: ${mins} minutes ${secs} seconds`}>
+      {mins}:{secs.toString().padStart(2, '0')}
+    </span>
+  )
+}
+
 interface RestTimerProps {
   defaultSecs: number
   onDismiss: () => void
   audioCtx: AudioContext | null
+  muted: boolean
 }
 
-function RestTimer({ defaultSecs, onDismiss, audioCtx }: RestTimerProps) {
+function RestTimer({ defaultSecs, onDismiss, audioCtx, muted }: RestTimerProps) {
   const [secs, setSecs] = useState(defaultSecs)
   const [running, setRunning] = useState(true)
   const remaining = useRef(defaultSecs)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fire = useCallback(() => {
-    if (audioCtx) {
+    if (audioCtx && !muted) {
       beep(audioCtx, 660, 0.08, 0.3)
       setTimeout(() => beep(audioCtx, 880, 0.15, 0.35), 100)
     }
     if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-  }, [audioCtx])
+  }, [audioCtx, muted])
 
   useEffect(() => {
     if (!running) {
@@ -240,9 +260,11 @@ interface ExerciseLoggerProps {
   dragHandleAttributes?: DraggableAttributes
   partnerHere?: string
   readOnly?: boolean
+  muted: boolean
+  restDefaultSecs: number
 }
 
-function SortableExerciseLogger(props: ExerciseLoggerProps & { partnerHere?: string }) {
+function SortableExerciseLogger(props: ExerciseLoggerProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: props.exercise.id })
 
@@ -263,7 +285,7 @@ function SortableExerciseLogger(props: ExerciseLoggerProps & { partnerHere?: str
   )
 }
 
-function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx, onAudioCtxInit, dragHandleListeners, dragHandleAttributes, partnerHere, readOnly }: ExerciseLoggerProps) {
+function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx, onAudioCtxInit, dragHandleListeners, dragHandleAttributes, partnerHere, readOnly, muted, restDefaultSecs }: ExerciseLoggerProps) {
   const { state, dispatch } = useStore()
   const existing = state.sessions[dateStr]?.entries[exercise.id]
   const prev = lastSessionBefore(state, exercise.id, dateStr)
@@ -291,7 +313,7 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
   const [feltEasy, setFeltEasy] = useState(existing?.feltEasy ?? false)
   const [expanded, setExpanded] = useState(false)
   const [showTimer, setShowTimer] = useState(false)
-  const [restDefault] = useState(90)
+  const restDefault = restDefaultSecs
 
   const saveEntry = (newSets: SetEntry[], fe: boolean) => {
     dispatch({ type: 'LOG_EXERCISE', date: dateStr, exerciseId: exercise.id, entry: { sets: newSets, feltEasy: fe } as ExerciseEntry })
@@ -303,13 +325,11 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
     setConfirmed(newConfirmed)
     saveEntry(sets, feltEasy)
     if (i < target.sets - 1) {
-      const ctx = audioCtx ?? onAudioCtxInit()
-      playDoneSound(ctx)
+      if (!muted) { const ctx = audioCtx ?? onAudioCtxInit(); playDoneSound(ctx) }
       if (navigator.vibrate) navigator.vibrate(80)
       setShowTimer(true)
     } else {
-      const ctx = audioCtx ?? onAudioCtxInit()
-      playDoneSound(ctx)
+      if (!muted) { const ctx = audioCtx ?? onAudioCtxInit(); playDoneSound(ctx) }
       if (navigator.vibrate) navigator.vibrate([80, 60, 120])
     }
   }
@@ -333,7 +353,7 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
   return (
     <div className={`card exercise-card${allDone ? ' exercise-done' : ''}`} style={{ marginBottom: 10 }}>
       {showTimer && (
-        <RestTimer defaultSecs={restDefault} audioCtx={audioCtx} onDismiss={() => setShowTimer(false)} />
+        <RestTimer defaultSecs={restDefault} audioCtx={audioCtx} muted={muted} onDismiss={() => setShowTimer(false)} />
       )}
 
       <div className="row gap-8 mb-8">
@@ -478,9 +498,11 @@ interface FocusModeProps {
   onAudioCtxInit: () => AudioContext
   onClose: () => void
   readOnly?: boolean
+  muted: boolean
+  restDefaultSecs: number
 }
 
-function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose, readOnly }: FocusModeProps) {
+function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose, readOnly, muted, restDefaultSecs }: FocusModeProps) {
   const [idx, setIdx] = useState(startIndex)
   const ex = exercises[idx]
 
@@ -503,6 +525,8 @@ function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAu
           audioCtx={audioCtx}
           onAudioCtxInit={onAudioCtxInit}
           readOnly={readOnly}
+          muted={muted}
+          restDefaultSecs={restDefaultSecs}
         />
       </div>
 
@@ -537,6 +561,26 @@ export default function WorkoutView({ username, level }: { username: string; lev
   const [dateStr, setDateStr] = useState(todayStr)
   const [focusIndex, setFocusIndex] = useState<number | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
+  const [muted, setMuted] = useState(() => localStorage.getItem(MUTE_KEY) === '1')
+  const [restDefaultSecs, setRestDefaultSecs] = useState(() => {
+    const saved = localStorage.getItem(REST_SECS_KEY)
+    return saved ? Number(saved) : REST_SECS_DEFAULT
+  })
+  const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null)
+
+  // Sync restDefaultSecs when the localStorage value changes (e.g., from Settings tab)
+  useEffect(() => {
+    const saved = localStorage.getItem(REST_SECS_KEY)
+    setRestDefaultSecs(saved ? Number(saved) : REST_SECS_DEFAULT)
+  }, [])
+
+  const toggleMute = useCallback(() => {
+    setMuted(m => {
+      const next = !m
+      localStorage.setItem(MUTE_KEY, next ? '1' : '0')
+      return next
+    })
+  }, [])
 
   const initAudio = useCallback(() => {
     if (!audioCtxRef.current) {
@@ -594,6 +638,7 @@ export default function WorkoutView({ username, level }: { username: string; lev
     setSessionId(data.session.id)
     setSessionInfo({ id: data.session.id, mode: data.session.mode, participants: data.participants })
     setShowStartModal(false)
+    setSessionStartedAt(Date.now())
   }, [])
 
   const createSession = useCallback((mode: 'solo' | 'shared', partnerUsername?: string) => {
@@ -718,6 +763,8 @@ export default function WorkoutView({ username, level }: { username: string; lev
           onAudioCtxInit={initAudio}
           onClose={() => setFocusIndex(null)}
           readOnly={readOnly}
+          muted={muted}
+          restDefaultSecs={restDefaultSecs}
         />
       )}
 
@@ -764,9 +811,18 @@ export default function WorkoutView({ username, level }: { username: string; lev
                 Workout {workoutType} - {getWorkout(workoutType as GymWorkout)?.name}
               </h2>
               {session?.done && <span className="badge badge-green">Done</span>}
+              {sessionStartedAt && <SessionTimer startedAt={sessionStartedAt} />}
               <button
                 className="btn btn-secondary btn-sm"
                 style={{ marginLeft: 'auto' }}
+                onClick={toggleMute}
+                aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}
+                title={muted ? 'Unmute sounds' : 'Mute sounds'}
+              >
+                {muted ? '🔇' : '🔔'}
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
                 onClick={() => setFocusIndex(0)}
                 aria-label="Enter focus mode"
               >
@@ -833,6 +889,8 @@ export default function WorkoutView({ username, level }: { username: string; lev
                     onAudioCtxInit={initAudio}
                     partnerHere={[...partnerPresence.entries()].find(([, eid]) => eid === ex.id)?.[0]}
                     readOnly={readOnly}
+                    muted={muted}
+                    restDefaultSecs={restDefaultSecs}
                   />
                 ))}
               </SortableContext>
