@@ -264,6 +264,23 @@ test('GET /api/admin/users returns 403 for non-admin, lists for admin', async (t
   await app.close()
 })
 
+test('GET /api/session/partner-candidates excludes self and non-privileged accounts', async (t) => {
+  const db = makeDb()
+  const jacobId = addUser(db, 'jacob', 'admin')
+  addUser(db, 'partner', 'user')
+  addUser(db, 'banned', 'none')
+  addUser(db, 'watcher', 'viewer')
+  const app = await buildServer(db)
+  const token = makeToken(app, jacobId, 'jacob', 'admin')
+
+  const res = await app.inject({ method: 'GET', url: '/api/session/partner-candidates', cookies: { session: token } })
+  assert.equal(res.statusCode, 200)
+  const names = JSON.parse(res.body).candidates.map(c => c.username)
+  assert.deepEqual(names, ['partner']) // user/admin only, excluding self (jacob)
+
+  await app.close()
+})
+
 test('admin PUT level changes the other account; last-admin demotion blocked', async (t) => {
   const db = makeDb()
   const adminId = addUser(db, 'jacob', 'admin')

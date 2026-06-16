@@ -345,6 +345,20 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
     },
   )
 
+  // GET /api/session/partner-candidates → other privileged accounts (user/admin), excluding self.
+  // Two users → at most one candidate; empty means "train alone, no prompt".
+  app.get('/api/session/partner-candidates', async (req: FastifyRequest, reply: FastifyReply) => {
+    const { username } = authedUser(req)
+    const rows = db.prepare(`
+      SELECT u.cwa_username AS username, COALESCE(p.level, 'user') AS level
+      FROM users u
+      LEFT JOIN user_privilege p ON p.user_id = u.id
+      WHERE u.cwa_username != ? AND COALESCE(p.level, 'user') IN ('user', 'admin')
+      ORDER BY u.created_at ASC
+    `).all(username) as { username: string; level: Privilege }[]
+    return reply.send({ candidates: rows })
+  })
+
   // GET /api/session/current?scopeDate=&workout= → current active session or { session: null }
   app.get('/api/session/current', async (req: FastifyRequest, reply: FastifyReply) => {
     const { username } = authedUser(req)

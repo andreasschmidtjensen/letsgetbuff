@@ -20,6 +20,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useStore } from '../store/store'
 import { useLiveOrder } from '../store/useLiveOrder'
+import StartSessionModal from '../components/StartSessionModal'
 import { computeProgramWeek, scheduleFor, todayDayName } from '@letsgetbuff/shared'
 import { todayKey, keyToDate } from '../lib/date'
 import { getWorkoutExercises, getWorkout, ExerciseDef } from '@letsgetbuff/shared'
@@ -581,12 +582,85 @@ export default function WorkoutView({ username, level }: { username: string; lev
   const planExercises = isGym ? getWorkoutExercises(workoutType as GymWorkout, programWeek) : []
   const planOrder = planExercises.map(e => e.id)
 
+  // ── Phase 13: session resolution (alone / with-partner / resume) ──────────
+  interface SessionInfo { id: number; mode: 'solo' | 'shared'; participants: { username: string }[] }
+  const [sessionId, setSessionId] = useState<number | null>(null)
+  const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null)
+  const [partnerCandidate, setPartnerCandidate] = useState<string | null>(null)
+  const [showStartModal, setShowStartModal] = useState(false)
+  const [resolveNonce, setResolveNonce] = useState(0)
+
+  const applySession = useCallback((data: { session: { id: number; mode: 'solo' | 'shared' }; participants: { username: string }[] }) => {
+    setSessionId(data.session.id)
+    setSessionInfo({ id: data.session.id, mode: data.session.mode, participants: data.participants })
+    setShowStartModal(false)
+  }, [])
+
+  const createSession = useCallback((mode: 'solo' | 'shared', partnerUsername?: string) => {
+    fetch('/api/session', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ scopeDate: dateStr, workout: workoutType, mode, partnerUsername }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.session) applySession(data) })
+      .catch(() => { /* offline — WorkoutView still renders plan order */ })
+  }, [dateStr, workoutType, applySession])
+
+  // On opening a gym workout: resume an active session, else prompt (if a partner
+  // exists) or silently create a solo one.
+  useEffect(() => {
+    if (!isGym) {
+      setSessionId(null); setSessionInfo(null); setShowStartModal(false)
+      return
+    }
+    let cancelled = false
+    setSessionId(null)
+    setSessionInfo(null)
+    setShowStartModal(false)
+    Promise.all([
+      fetch(`/api/session/current?scopeDate=${encodeURIComponent(dateStr)}&workout=${encodeURIComponent(workoutType)}`, { credentials: 'include' })
+        .then(r => r.ok ? r.json() : { session: null }),
+      fetch('/api/session/partner-candidates', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : { candidates: [] }),
+    ])
+      .then(([cur, cand]: [{ session: { id: number; mode: 'solo' | 'shared' } | null; participants?: { username: string }[] }, { candidates: { username: string }[] }]) => {
+        if (cancelled) return
+        const candidate = cand.candidates?.[0]?.username ?? null
+        setPartnerCandidate(candidate)
+        if (cur.session) {
+          applySession({ session: cur.session, participants: cur.participants ?? [] })
+        } else if (candidate) {
+          setShowStartModal(true)
+        } else {
+          createSession('solo')
+        }
+      })
+      .catch(() => { if (!cancelled) createSession('solo') })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateStr, workoutType, isGym, resolveNonce])
+
+  const endCurrentSession = useCallback(async () => {
+    if (sessionId == null) return
+    try {
+      await fetch(`/api/session/${sessionId}/end`, { method: 'POST', credentials: 'include' })
+    } catch { /* ignore — re-resolve anyway */ }
+    setSessionId(null)
+    setSessionInfo(null)
+    setResolveNonce(n => n + 1)  // re-prompt / re-create
+  }, [sessionId])
+
+  const partnerNames = sessionInfo?.participants.map(p => p.username).filter(u => u !== username) ?? []
+
   const { order: liveOrder, reorder, wsStatus, partnerPresence, sendPresence } = useLiveOrder({
     planOrder,
     date: dateStr,
     workoutType,
     username,
-    enabled: isGym,
+    enabled: isGym && sessionId != null,
+    sessionId,
   })
 
   const exerciseMap = new Map(planExercises.map(e => [e.id, e]))
@@ -627,6 +701,13 @@ export default function WorkoutView({ username, level }: { username: string; lev
 
   return (
     <>
+      {showStartModal && isGym && (
+        <StartSessionModal
+          partner={partnerCandidate ? { username: partnerCandidate } : null}
+          onChoose={(mode, partnerUsername) => createSession(mode, partnerUsername)}
+        />
+      )}
+
       {focusIndex !== null && isGym && (
         <FocusMode
           exercises={exercises}
@@ -692,6 +773,25 @@ export default function WorkoutView({ username, level }: { username: string; lev
                 Focus mode
               </button>
             </div>
+
+            {/* Session bar: mode + end-session affordance (Phase 13) */}
+            {sessionId != null && (
+              <div className="row gap-8 mb-8" style={{ alignItems: 'center', fontSize: 12 }}>
+                <span className="muted">
+                  {sessionInfo?.mode === 'shared'
+                    ? `👥 Shared session${partnerNames.length ? ` with ${partnerNames.join(', ')}` : ''}`
+                    : '🏋️ Solo session'}
+                </span>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ marginLeft: 'auto' }}
+                  onClick={endCurrentSession}
+                  aria-label="End session"
+                >
+                  End session
+                </button>
+              </div>
+            )}
 
             <div className="safety-banner mb-12" role="note">
               Key rule: No loaded spinal flexion. Knees track over toes.
