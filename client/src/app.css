@@ -515,6 +515,76 @@ h3 { font-size: 15px; margin: 0 0 8px; }
   flex-shrink: 0;
 }
 
+/* Prominent entry button on the list view */
+.btn-start-focus {
+  width: 100%;
+  padding: 16px;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+/* ── Focus mode: bigger touch UI (scoped to .focus-body) ─────────────────────── */
+.focus-body .input-sm {
+  font-size: 20px;
+  padding: 14px 12px;
+  min-height: 56px;
+}
+.focus-body .set-row2 {
+  min-height: 60px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.focus-body .set-num2 { font-size: 16px; width: 24px; }
+.focus-body .btn-check {
+  min-width: 64px;
+  min-height: 64px;
+  font-size: 28px;
+}
+.focus-body .set-display {
+  padding: 16px;
+  font-size: 18px;
+}
+.focus-body .exercise-name { font-size: 18px; }
+
+/* "Start (Ns)" countdown trigger on a timed set */
+.btn-start-timer {
+  flex: 1;
+  min-height: 56px;
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Participant chip atop each logger in a shared (two-person) focus session */
+.focus-participant {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-radius: 6px;
+  padding: 3px 10px;
+  margin-bottom: 8px;
+}
+
+/* Big count-down ring + clock for timed exercises */
+.exercise-timer-card { max-width: 360px; }
+.exercise-timer-ring { width: 160px; height: 160px; }
+.exercise-timer-time { font-size: 56px; }
+
+/* "Next exercise" call-to-action once the current exercise is complete */
+.focus-next-ready {
+  animation: nextPulse 1.4s ease-in-out infinite;
+}
+@keyframes nextPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(232, 160, 32, 0.5); }
+  70%  { box-shadow: 0 0 0 10px rgba(232, 160, 32, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(232, 160, 32, 0); }
+}
+
 /* ── General a11y improvements ──────────────────────────────────────────────── */
 .btn:focus-visible,
 .nav-btn:focus-visible,

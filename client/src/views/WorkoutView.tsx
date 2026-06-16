@@ -149,6 +149,109 @@ function RestTimer({ defaultSecs, onDismiss, audioCtx, muted }: RestTimerProps) 
   )
 }
 
+interface ExerciseTimerProps {
+  targetSecs: number
+  onComplete: (achievedSecs: number) => void
+  onCancel: () => void
+  audioCtx: AudioContext | null
+  onAudioCtxInit: () => AudioContext
+  muted: boolean
+}
+
+// Active count-down for a timed exercise set (e.g. Plank). Mirrors RestTimer but
+// reports the achieved seconds back so the set can be logged. Length is adjustable
+// on the fly (±15s). Completes naturally at 0, or early via "Done".
+function ExerciseTimer({ targetSecs, onComplete, onCancel, audioCtx, onAudioCtxInit, muted }: ExerciseTimerProps) {
+  const [total, setTotal] = useState(targetSecs)
+  const [secs, setSecs] = useState(targetSecs)
+  const [running, setRunning] = useState(true)
+  const remaining = useRef(targetSecs)
+  const totalRef = useRef(targetSecs)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const firedRef = useRef(false)
+
+  const fire = useCallback(() => {
+    if (firedRef.current) return
+    firedRef.current = true
+    if (!muted) { const ctx = audioCtx ?? onAudioCtxInit(); beep(ctx, 660, 0.08, 0.3); setTimeout(() => beep(ctx, 880, 0.15, 0.35), 100) }
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+    onComplete(totalRef.current)
+  }, [audioCtx, muted, onAudioCtxInit, onComplete])
+
+  useEffect(() => {
+    if (!running) {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      return
+    }
+    intervalRef.current = setInterval(() => {
+      remaining.current -= 1
+      setSecs(remaining.current)
+      if (remaining.current <= 0) {
+        clearInterval(intervalRef.current!)
+        setRunning(false)
+        fire()
+      }
+    }, 1000)
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
+  }, [running, fire])
+
+  const adjust = (delta: number) => {
+    const nextTotal = Math.max(5, totalRef.current + delta)
+    const nextRemaining = Math.max(1, remaining.current + delta)
+    totalRef.current = nextTotal
+    remaining.current = nextRemaining
+    setTotal(nextTotal)
+    setSecs(nextRemaining)
+  }
+
+  const stopEarly = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    const achieved = Math.max(1, totalRef.current - Math.max(0, remaining.current))
+    onComplete(achieved)
+  }
+
+  const pct = Math.max(0, secs / total)
+  const mins = Math.floor(Math.abs(secs) / 60)
+  const secsPart = Math.abs(secs) % 60
+  const display = `${mins}:${secsPart.toString().padStart(2, '0')}`
+
+  return (
+    <div className="rest-timer-overlay" role="dialog" aria-label="Exercise timer" aria-live="polite">
+      <div className="rest-timer-card exercise-timer-card">
+        <div className="rest-timer-label">{secs <= 0 ? 'Done!' : 'Hold'}</div>
+        <svg viewBox="0 0 80 80" className="rest-timer-ring exercise-timer-ring" aria-hidden="true">
+          <circle cx="40" cy="40" r="34" fill="none" stroke="var(--surface2)" strokeWidth="6"/>
+          <circle
+            cx="40" cy="40" r="34"
+            fill="none"
+            stroke={secs <= 0 ? 'var(--green)' : 'var(--accent)'}
+            strokeWidth="6"
+            strokeDasharray={`${2 * Math.PI * 34}`}
+            strokeDashoffset={`${2 * Math.PI * 34 * (1 - pct)}`}
+            strokeLinecap="round"
+            transform="rotate(-90 40 40)"
+            style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s' }}
+          />
+        </svg>
+        <div className="rest-timer-time exercise-timer-time" aria-label={`${mins} minutes ${secsPart} seconds remaining`}>
+          {display}
+        </div>
+        <div className="rest-timer-adj">
+          <button className="btn btn-secondary btn-sm" onClick={() => adjust(-15)} aria-label="Subtract 15 seconds">-15s</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => setRunning(r => !r)} aria-label={running ? 'Pause timer' : 'Resume timer'}>
+            {running ? 'Pause' : 'Resume'}
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => adjust(15)} aria-label="Add 15 seconds">+15s</button>
+        </div>
+        <div className="rest-timer-adj" style={{ marginTop: 8 }}>
+          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={onCancel} aria-label="Cancel timer">Cancel</button>
+          <button className="btn btn-primary" style={{ flex: 2 }} onClick={stopEarly} aria-label="Log time and finish set">Done</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function VideoCarousel({ urls }: { urls: string[] }) {
   const [i, setI] = useState(0)
   const touchX = useRef<number | null>(null)
@@ -182,7 +285,7 @@ function VideoCarousel({ urls }: { urls: string[] }) {
 }
 
 function lastSessionBefore(
-  state: ReturnType<typeof useStore>['state'],
+  state: { sessions: Record<string, Session> },
   exerciseId: string,
   beforeDate: string
 ): { sets: SetEntry[]; feltEasy: boolean } | null {
@@ -192,6 +295,20 @@ function lastSessionBefore(
     if (entry) return entry
   }
   return null
+}
+
+// Is this exercise fully logged for the given day in the given sessions blob?
+// Mirrors the `confirmed` initialisation inside ExerciseLogger.
+function exerciseDoneIn(
+  sessions: Record<string, Session>,
+  dateStr: string,
+  ex: ExerciseDef,
+  programWeek: number,
+): boolean {
+  const target = repTargetFor(ex, programWeek)
+  const logged = sessions[dateStr]?.entries[ex.id]?.sets ?? []
+  const doneCount = logged.filter(s => s.reps !== undefined || s.seconds !== undefined).length
+  return doneCount >= target.sets
 }
 
 function formatSet(s: SetEntry, ex: ExerciseDef): string {
@@ -266,6 +383,14 @@ interface ExerciseLoggerProps {
   proxyFor?: string | null
   sessionId?: number | null
   workoutType?: string
+  /** Alternate data source (partner's sessions) — when set, read existing/prev from here. */
+  dataState?: { sessions: Record<string, Session> }
+  /** Small header chip identifying whose log this is ("You" / partner name). */
+  participantLabel?: string
+  /** Called after a proxy save so the parent can refresh partner data. */
+  onLogged?: () => void
+  /** Render in the larger focus layout and start expanded. */
+  focus?: boolean
 }
 
 function SortableExerciseLogger(props: ExerciseLoggerProps) {
@@ -289,10 +414,12 @@ function SortableExerciseLogger(props: ExerciseLoggerProps) {
   )
 }
 
-function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx, onAudioCtxInit, dragHandleListeners, dragHandleAttributes, partnerHere, readOnly, muted, restDefaultSecs, proxyFor, sessionId, workoutType }: ExerciseLoggerProps) {
+function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx, onAudioCtxInit, dragHandleListeners, dragHandleAttributes, partnerHere, readOnly, muted, restDefaultSecs, proxyFor, sessionId, workoutType, dataState, participantLabel, onLogged, focus }: ExerciseLoggerProps) {
   const { state, dispatch } = useStore()
-  const existing = state.sessions[dateStr]?.entries[exercise.id]
-  const prev = lastSessionBefore(state, exercise.id, dateStr)
+  // In proxy mode the partner's sessions blob is the data source; otherwise own store.
+  const read = dataState ?? state
+  const existing = read.sessions[dateStr]?.entries[exercise.id]
+  const prev = lastSessionBefore(read, exercise.id, dateStr)
 
   const lastWeight = prev?.sets.find(s => s.kg !== undefined)?.kg
   const suggestion = suggestNextWeight(exercise.progressionType, lastWeight, prev?.feltEasy ?? false)
@@ -315,8 +442,9 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
   )
   const [editing, setEditing] = useState<number | null>(null)
   const [feltEasy, setFeltEasy] = useState(existing?.feltEasy ?? false)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(focus ?? false)
   const [showTimer, setShowTimer] = useState(false)
+  const [timingSet, setTimingSet] = useState<number | null>(null)
   const restDefault = restDefaultSecs
 
   const saveEntry = (newSets: SetEntry[], fe: boolean) => {
@@ -327,7 +455,9 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
         credentials: 'include',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sessionId, date: dateStr, exerciseId: exercise.id, workout: workoutType, entry: { sets: newSets, feltEasy: fe } }),
-      }).catch(() => { /* offline — partner will sync later */ })
+      })
+        .then(() => onLogged?.())
+        .catch(() => { /* offline — partner will sync later */ })
     } else {
       dispatch({ type: 'LOG_EXERCISE', date: dateStr, exerciseId: exercise.id, entry: { sets: newSets, feltEasy: fe } as ExerciseEntry })
     }
@@ -338,6 +468,25 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
     const newConfirmed = confirmed.map((c, idx) => idx === i ? true : c)
     setConfirmed(newConfirmed)
     saveEntry(sets, feltEasy)
+    if (i < target.sets - 1) {
+      if (!muted) { const ctx = audioCtx ?? onAudioCtxInit(); playDoneSound(ctx) }
+      if (navigator.vibrate) navigator.vibrate(80)
+      setShowTimer(true)
+    } else {
+      if (!muted) { const ctx = audioCtx ?? onAudioCtxInit(); playDoneSound(ctx) }
+      if (navigator.vibrate) navigator.vibrate([80, 60, 120])
+    }
+  }
+
+  // Timed exercise: the countdown finished (or was stopped) → log the achieved seconds,
+  // confirm the set, and run the same side-effects as a manual confirm.
+  const completeTimedSet = (i: number, achievedSecs: number) => {
+    setTimingSet(null)
+    if (readOnly) return
+    const newSets = sets.map((s, idx) => idx === i ? { ...s, seconds: achievedSecs } : s)
+    setSets(newSets)
+    setConfirmed(confirmed.map((c, idx) => idx === i ? true : c))
+    saveEntry(newSets, feltEasy)
     if (i < target.sets - 1) {
       if (!muted) { const ctx = audioCtx ?? onAudioCtxInit(); playDoneSound(ctx) }
       if (navigator.vibrate) navigator.vibrate(80)
@@ -368,6 +517,20 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
     <div className={`card exercise-card${allDone ? ' exercise-done' : ''}`} style={{ marginBottom: 10 }}>
       {showTimer && (
         <RestTimer defaultSecs={restDefault} audioCtx={audioCtx} muted={muted} onDismiss={() => setShowTimer(false)} />
+      )}
+      {timingSet !== null && (
+        <ExerciseTimer
+          targetSecs={sets[timingSet]?.seconds ?? target.seconds ?? 30}
+          onComplete={(achieved) => completeTimedSet(timingSet, achieved)}
+          onCancel={() => setTimingSet(null)}
+          audioCtx={audioCtx}
+          onAudioCtxInit={onAudioCtxInit}
+          muted={muted}
+        />
+      )}
+
+      {participantLabel && (
+        <div className="focus-participant" aria-label={`Logging for ${participantLabel}`}>{participantLabel}</div>
       )}
 
       <div className="row gap-8 mb-8">
@@ -462,19 +625,28 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
                     value={s.rir ?? ''} onChange={e => updateSet(i, 'rir', e.target.value)} min={0} max={10} aria-label="Reps in reserve" />
                   <button className="btn-check" onClick={() => { setEditing(null); confirmSet(i) }} aria-label="Confirm set" disabled={readOnly}>✓</button>
                 </div>
+              ) : target.seconds ? (
+                <div className="set-inputs" role="group" aria-label={`Set ${i + 1} inputs`}>
+                  <button
+                    className="btn btn-primary btn-start-timer"
+                    onClick={() => setTimingSet(i)}
+                    aria-label={`Start ${s.seconds ?? target.seconds} second timer for set ${i + 1}`}
+                    disabled={readOnly}
+                  >
+                    ▶ Start {s.seconds ?? target.seconds}s
+                  </button>
+                  <input type="number" className="input-sm" placeholder="sec"
+                    value={s.seconds ?? ''} onChange={e => updateSet(i, 'seconds', e.target.value)} min={0} aria-label="Seconds (manual entry)" />
+                  <button className="btn-check" onClick={() => confirmSet(i)} aria-label={`Confirm set ${i + 1}`} disabled={readOnly}>✓</button>
+                </div>
               ) : (
                 <div className="set-inputs" role="group" aria-label={`Set ${i + 1} inputs`}>
                   {exercise.requiresKg ? (
                     <input type="number" className="input-sm" placeholder="kg"
                       value={s.kg ?? ''} onChange={e => updateSet(i, 'kg', e.target.value)} min={0} step={0.5} aria-label="Weight in kg" />
                   ) : <span />}
-                  {target.seconds ? (
-                    <input type="number" className="input-sm" placeholder="sec"
-                      value={s.seconds ?? ''} onChange={e => updateSet(i, 'seconds', e.target.value)} min={0} aria-label="Seconds" />
-                  ) : (
-                    <input type="number" className="input-sm" placeholder="reps"
-                      value={s.reps ?? ''} onChange={e => updateSet(i, 'reps', e.target.value)} min={0} aria-label="Reps" />
-                  )}
+                  <input type="number" className="input-sm" placeholder="reps"
+                    value={s.reps ?? ''} onChange={e => updateSet(i, 'reps', e.target.value)} min={0} aria-label="Reps" />
                   <input type="number" className="input-sm" placeholder="RIR"
                     value={s.rir ?? ''} onChange={e => updateSet(i, 'rir', e.target.value)} min={0} max={10} aria-label="Reps in reserve" />
                   <button className="btn-check" onClick={() => confirmSet(i)} aria-label={`Confirm set ${i + 1}`} disabled={readOnly}>✓</button>
@@ -514,19 +686,45 @@ interface FocusModeProps {
   readOnly?: boolean
   muted: boolean
   restDefaultSecs: number
-  proxyFor?: string | null
   sessionId?: number | null
   workoutType?: string
+  /** Shared session: the partner's name + their sessions blob enable the dual logger. */
+  partnerName?: string | null
+  partnerState?: { sessions: Record<string, Session> } | null
+  refreshPartner?: () => void
+  /** Broadcast which exercise is focused (presence for a two-device shared session). */
+  sendPresence?: (exerciseId: string) => void
 }
 
-function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose, readOnly, muted, restDefaultSecs, proxyFor, sessionId, workoutType }: FocusModeProps) {
-  const [idx, setIdx] = useState(startIndex)
+function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose, readOnly, muted, restDefaultSecs, sessionId, workoutType, partnerName, partnerState, refreshPartner, sendPresence }: FocusModeProps) {
+  const { state } = useStore()
+  // Track the focused exercise by id (not position) so a live reorder can't teleport us.
+  const [currentId, setCurrentId] = useState(exercises[startIndex]?.id ?? exercises[0]?.id)
+  let idx = exercises.findIndex(e => e.id === currentId)
+  if (idx === -1) idx = Math.min(startIndex, exercises.length - 1)
   const ex = exercises[idx]
+
+  // Broadcast presence whenever the focused exercise changes.
+  useEffect(() => {
+    if (ex) sendPresence?.(ex.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ex?.id])
+
+  if (!ex) return null
+
+  const shared = Boolean(partnerName && partnerState)
+  const selfDone = exerciseDoneIn(state.sessions, dateStr, ex, programWeek)
+  const partnerDone = shared ? exerciseDoneIn(partnerState!.sessions, dateStr, ex, programWeek) : true
+  const allDone = selfDone && partnerDone
+
+  const goPrev = () => { if (idx > 0) setCurrentId(exercises[idx - 1].id) }
+  const goNext = () => { if (idx < exercises.length - 1) setCurrentId(exercises[idx + 1].id) }
+  const isLast = idx >= exercises.length - 1
 
   return (
     <div className="focus-overlay" role="dialog" aria-label="Focus workout mode" aria-modal="true">
       <div className="focus-header">
-        <button className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Exit focus mode">Exit focus</button>
+        <button className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Exit focus mode">Overview</button>
         <span className="muted" style={{ fontSize: 13 }}>{idx + 1} / {exercises.length}</span>
         <div className="focus-progress-bar" aria-hidden="true">
           <div className="focus-progress-fill" style={{ width: `${((idx + 1) / exercises.length) * 100}%` }} />
@@ -535,7 +733,7 @@ function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAu
 
       <div className="focus-body">
         <ExerciseLogger
-          key={`focus-${dateStr}-${ex.id}`}
+          key={`focus-self-${dateStr}-${ex.id}`}
           exercise={ex}
           dateStr={dateStr}
           programWeek={programWeek}
@@ -544,21 +742,54 @@ function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAu
           readOnly={readOnly}
           muted={muted}
           restDefaultSecs={restDefaultSecs}
-          proxyFor={proxyFor}
           sessionId={sessionId}
           workoutType={workoutType}
+          focus
+          participantLabel={shared ? 'You' : undefined}
         />
+        {shared && (
+          <ExerciseLogger
+            key={`focus-partner-${dateStr}-${ex.id}`}
+            exercise={ex}
+            dateStr={dateStr}
+            programWeek={programWeek}
+            audioCtx={audioCtx}
+            onAudioCtxInit={onAudioCtxInit}
+            readOnly={readOnly}
+            muted={muted}
+            restDefaultSecs={restDefaultSecs}
+            sessionId={sessionId}
+            workoutType={workoutType}
+            focus
+            participantLabel={partnerName!}
+            proxyFor={partnerName!}
+            dataState={partnerState!}
+            onLogged={refreshPartner}
+          />
+        )}
       </div>
 
       <div className="focus-nav">
         <button className="btn btn-secondary" style={{ flex: 1 }} disabled={idx === 0}
-          onClick={() => setIdx(i => i - 1)} aria-label="Previous exercise">Prev</button>
-        {idx < exercises.length - 1 ? (
-          <button className="btn btn-primary" style={{ flex: 2 }}
-            onClick={() => setIdx(i => i + 1)} aria-label="Next exercise">Next</button>
+          onClick={goPrev} aria-label="Previous exercise">Prev</button>
+        {!isLast ? (
+          <button
+            className={`btn ${allDone ? 'btn-primary focus-next-ready' : 'btn-secondary'}`}
+            style={{ flex: 2 }}
+            onClick={goNext}
+            aria-label="Next exercise"
+          >
+            {allDone ? 'Next exercise →' : 'Next'}
+          </button>
         ) : (
-          <button className="btn btn-primary" style={{ flex: 2 }}
-            onClick={onClose} aria-label="Finish workout">Finish</button>
+          <button
+            className={`btn ${allDone ? 'btn-primary focus-next-ready' : 'btn-secondary'}`}
+            style={{ flex: 2 }}
+            onClick={onClose}
+            aria-label="Finish workout"
+          >
+            {allDone ? 'Finish ✓' : 'Finish'}
+          </button>
         )}
       </div>
     </div>
@@ -726,6 +957,27 @@ export default function WorkoutView({ username, level }: { username: string; lev
   }, [sessionId])
 
   const partnerNames = sessionInfo?.participants.map(p => p.username).filter(u => u !== username) ?? []
+  const partnerName = partnerNames[0] ?? null
+  const isShared = sessionInfo?.mode === 'shared' && partnerName != null
+
+  // Partner's sessions blob — powers the dual logger in focus mode. Best-effort:
+  // if the fetch fails the partner logger simply starts blank.
+  const [partnerState, setPartnerState] = useState<{ sessions: Record<string, Session> } | null>(null)
+  const [partnerNonce, setPartnerNonce] = useState(0)
+  const refreshPartner = useCallback(() => setPartnerNonce(n => n + 1), [])
+
+  useEffect(() => {
+    if (!isShared) { setPartnerState(null); return }
+    let cancelled = false
+    fetch('/api/partner-history', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { sessions?: Record<string, Session> } | null) => {
+        if (cancelled || !data) return
+        setPartnerState({ sessions: data.sessions ?? {} })
+      })
+      .catch(() => { /* best-effort */ })
+    return () => { cancelled = true }
+  }, [isShared, partnerNonce, dateStr, workoutType])
 
   const { order: liveOrder, reorder, wsStatus, partnerPresence, sendPresence } = useLiveOrder({
     planOrder,
@@ -794,9 +1046,12 @@ export default function WorkoutView({ username, level }: { username: string; lev
           readOnly={readOnly}
           muted={muted}
           restDefaultSecs={restDefaultSecs}
-          proxyFor={proxyFor}
           sessionId={sessionId}
           workoutType={workoutType}
+          partnerName={isShared ? partnerName : null}
+          partnerState={isShared ? partnerState : null}
+          refreshPartner={refreshPartner}
+          sendPresence={sendPresence}
         />
       )}
 
@@ -852,13 +1107,6 @@ export default function WorkoutView({ username, level }: { username: string; lev
                 title={muted ? 'Unmute sounds' : 'Mute sounds'}
               >
                 {muted ? '🔇' : '🔔'}
-              </button>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => setFocusIndex(0)}
-                aria-label="Enter focus mode"
-              >
-                Focus mode
               </button>
             </div>
 
@@ -926,6 +1174,16 @@ export default function WorkoutView({ username, level }: { username: string; lev
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>New rep phase</div>
                 <div className="muted" style={{ fontSize: 12 }}>Rep range dropped. Consider increasing weight ~10%.</div>
               </div>
+            )}
+
+            {exercises.length > 0 && (
+              <button
+                className="btn btn-primary btn-start-focus"
+                onClick={() => setFocusIndex(0)}
+                aria-label="Start focus mode"
+              >
+                ▶ Start focus mode
+              </button>
             )}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 11, color: wsLabel.color }}>
