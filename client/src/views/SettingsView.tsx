@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { useStore, SyncStatus } from '../store/store'
 import { useTestMode } from '../store/testMode'
+import { TIMER_SOUNDS, getTimerSound, setTimerSound, playTimerEnd, type TimerSound } from '../lib/sounds'
 
 // ── Theme helpers (exported for use in main.tsx) ──────────────────────────────
 const THEME_KEY = 'letsgetbuff-theme'
@@ -481,6 +482,48 @@ function RestTimerCard() {
   )
 }
 
+// ── Timer sound preference ──────────────────────────────────────────────────────
+
+function TimerSoundCard() {
+  const [sound, setSound] = useState<TimerSound>(() => getTimerSound())
+
+  const preview = (s: TimerSound) => {
+    if (s === 'shout') { playTimerEnd(null as unknown as AudioContext, s); return }  // uses speech synthesis
+    const Ctor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!Ctor) return
+    const ctx = new Ctor()
+    playTimerEnd(ctx, s)
+    setTimeout(() => ctx.close().catch(() => {}), 2500)
+  }
+
+  const choose = (s: TimerSound) => {
+    setSound(s)
+    setTimerSound(s)
+    preview(s)  // play it so the choice is audible immediately
+  }
+
+  return (
+    <div className="card mb-12">
+      <div className="card-title">Timer sound</div>
+      <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
+        Played when a rest or exercise timer runs out. Tap one to hear it.
+      </p>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="Timer sound">
+        {TIMER_SOUNDS.map(opt => (
+          <button
+            key={opt.value}
+            className={`btn btn-sm ${sound === opt.value ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => choose(opt.value)}
+            aria-pressed={sound === opt.value}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Test mode toggle (all users, frontend-only) ────────────────────────────────
 
 function TestModeCard() {
@@ -680,6 +723,9 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
 
       {/* Rest timer */}
       <RestTimerCard />
+
+      {/* Timer sound */}
+      <TimerSoundCard />
 
       {/* Phase 8: Exercise discovery */}
       <div className="card mb-12">

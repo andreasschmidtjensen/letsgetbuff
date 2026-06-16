@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useStore } from '../store/store'
 import { useTestMode } from '../store/testMode'
 import { useLiveOrder } from '../store/useLiveOrder'
+import { playDoneSound, playTimerEnd } from '../lib/sounds'
 import StartSessionModal from '../components/StartSessionModal'
 import TestModeBanner from '../components/TestModeBanner'
 import { computeProgramWeek, scheduleFor, todayDayName } from '@letsgetbuff/shared'
@@ -33,23 +34,6 @@ import type { Privilege } from '@letsgetbuff/shared'
 const MUTE_KEY = 'letsgetbuff-mute'
 const REST_SECS_KEY = 'letsgetbuff-rest-secs'
 const REST_SECS_DEFAULT = 90
-
-function beep(ctx: AudioContext, freq = 880, duration = 0.12, vol = 0.4) {
-  const osc = ctx.createOscillator()
-  const gain = ctx.createGain()
-  osc.connect(gain)
-  gain.connect(ctx.destination)
-  osc.frequency.value = freq
-  gain.gain.setValueAtTime(vol, ctx.currentTime)
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
-  osc.start(ctx.currentTime)
-  osc.stop(ctx.currentTime + duration)
-}
-
-function playDoneSound(ctx: AudioContext) {
-  beep(ctx, 880, 0.1, 0.35)
-  setTimeout(() => beep(ctx, 1100, 0.18, 0.3), 120)
-}
 
 // "45s", "10 min", or "1:30" — friendly label for a duration in seconds.
 function formatDuration(secs: number): string {
@@ -100,10 +84,7 @@ function RestTimer({ defaultSecs, onDismiss, audioCtx, muted }: RestTimerProps) 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fire = useCallback(() => {
-    if (audioCtx && !muted) {
-      beep(audioCtx, 660, 0.08, 0.3)
-      setTimeout(() => beep(audioCtx, 880, 0.15, 0.35), 100)
-    }
+    if (audioCtx && !muted) playTimerEnd(audioCtx)
     if (navigator.vibrate) navigator.vibrate([200, 100, 200])
   }, [audioCtx, muted])
 
@@ -195,7 +176,7 @@ function ExerciseTimer({ targetSecs, onComplete, onCancel, audioCtx, onAudioCtxI
   const fire = useCallback(() => {
     if (firedRef.current) return
     firedRef.current = true
-    if (!muted) { const ctx = audioCtx ?? onAudioCtxInit(); beep(ctx, 660, 0.08, 0.3); setTimeout(() => beep(ctx, 880, 0.15, 0.35), 100) }
+    if (!muted) { const ctx = audioCtx ?? onAudioCtxInit(); playTimerEnd(ctx) }
     if (navigator.vibrate) navigator.vibrate([200, 100, 200])
     onComplete(totalRef.current)
   }, [audioCtx, muted, onAudioCtxInit, onComplete])
@@ -559,12 +540,11 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
     setSets(newSets)
     setConfirmed(confirmed.map((c, idx) => idx === i ? true : c))
     saveEntry(newSets, feltEasy)
+    // The countdown's own alarm already sounded; just buzz + offer rest.
     if (i < target.sets - 1) {
-      if (!muted) { const ctx = audioCtx ?? onAudioCtxInit(); playDoneSound(ctx) }
       if (navigator.vibrate) navigator.vibrate(80)
       setShowTimer(true)
     } else {
-      if (!muted) { const ctx = audioCtx ?? onAudioCtxInit(); playDoneSound(ctx) }
       if (navigator.vibrate) navigator.vibrate([80, 60, 120])
     }
   }
