@@ -11,11 +11,15 @@
  *   POST /api/plan/propose         → ask Claude for a new exercise (stores as pending)
  *   POST /api/plan/approve/:id     → validate + append to plan (bumps version)
  *   POST /api/plan/reject/:id      → mark proposal rejected
+ *
+ * Phase 16: proxy input
+ *   PUT  /api/proxy-log            → write an exercise entry into the partner's state
+ *                                    (caller must be in an active shared session)
  */
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { EMPTY_STATE, SCHEMA_VERSION } from '@letsgetbuff/shared'
-import type { AppState, Plan } from '@letsgetbuff/shared'
+import type { AppState, Plan, Session, ExerciseEntry } from '@letsgetbuff/shared'
 import type { Db } from './db.js'
 import { proposeExercise, validateExerciseDef, isAiConfigured, MISSING_KEY_MESSAGE } from './claude.js'
 import { requirePrivilege, type Privilege } from './auth.js'
@@ -25,6 +29,7 @@ import {
   getSessionSnapshot,
   liveOrderForSession,
   isParticipant,
+  getParticipants,
   endSession,
 } from './sessions.js'
 
@@ -398,6 +403,98 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       const live = liveOrderForSession(db, id)
       if (!live) return reply.code(404).send({ error: 'No such session' })
       return reply.send(live)
+    },
+  )
+
+  // ── Phase 16: Proxy input ────────────────────────────────────────────────────
+  //
+  // PUT /api/proxy-log
+  //   Writes a single exercise entry into the partner's app_state. The caller
+  //   must be a participant in an active shared session; the partner is the
+  //   other participant. Viewers are blocked (403).
+  //
+  //   Body: { sessionId, date, exerciseId, workout, entry: { sets, feltEasy } }
+  //
+  app.put<{
+    Body: {
+      sessionId: number
+      date: string
+      exerciseId: string
+      workout: string
+      entry: { sets: unknown[]; feltEasy: boolean }
+    }
+  }>(
+    '/api/proxy-log',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['sessionId', 'date', 'exerciseId', 'workout', 'entry'],
+          properties: {
+            sessionId:   { type: 'number' },
+            date:        { type: 'string' },
+            exerciseId:  { type: 'string' },
+            workout:     { type: 'string' },
+            entry:       { type: 'object', additionalProperties: true },
+          },
+        },
+      },
+    },
+    async (req: FastifyRequest<{ Body: { sessionId: number; date: string; exerciseId: string; workout: string; entry: { sets: unknown[]; feltEasy: boolean } } }>, reply: FastifyReply) => {
+      const { username, level } = authedUser(req)
+      if (level === 'viewer') return reply.code(403).send({ error: 'Viewers cannot log data' })
+
+      const userId = getUserId(db, username)
+      const { sessionId, date, exerciseId, workout, entry } = req.body
+
+      // Caller must be a participant.
+      if (!isParticipant(db, sessionId, userId)) {
+        return reply.code(403).send({ error: 'Not a participant of this session' })
+      }
+
+      // Find the partner (the other participant).
+      const participants = getParticipants(db, sessionId)
+      const partner = participants.find(p => p.username !== username)
+      if (!partner) {
+        return reply.code(400).send({ error: 'No partner in this session — proxy log requires a shared session' })
+      }
+
+      // Resolve partner's user id.
+      const partnerRow = db
+        .prepare('SELECT id FROM users WHERE cwa_username = ?')
+        .get(partner.username) as { id: number } | undefined
+      if (!partnerRow) return reply.code(404).send({ error: 'Partner user record not found' })
+
+      // Load partner's current state (or start from EMPTY_STATE).
+      const stateRow = db
+        .prepare('SELECT json FROM app_state WHERE user_id = ?')
+        .get(partnerRow.id) as { json: string } | undefined
+      const partnerState: AppState = stateRow
+        ? (JSON.parse(stateRow.json) as AppState)
+        : { ...EMPTY_STATE }
+
+      // Merge the exercise entry. Ensure the session row exists.
+      if (!partnerState.sessions[date]) {
+        partnerState.sessions[date] = {
+          workout: workout as Session['workout'],
+          done: false,
+          entries: {},
+        }
+      }
+      partnerState.sessions[date].entries[exerciseId] = entry as ExerciseEntry
+
+      // Persist.
+      const now = new Date().toISOString()
+      db.prepare(`
+        INSERT INTO app_state (user_id, json, schema_version, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT (user_id) DO UPDATE SET
+          json = excluded.json,
+          schema_version = excluded.schema_version,
+          updated_at = excluded.updated_at
+      `).run(partnerRow.id, JSON.stringify(partnerState), partnerState.schemaVersion ?? SCHEMA_VERSION, now)
+
+      return reply.send({ ok: true, partner: partner.username, updatedAt: now })
     },
   )
 }

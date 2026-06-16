@@ -262,6 +262,10 @@ interface ExerciseLoggerProps {
   readOnly?: boolean
   muted: boolean
   restDefaultSecs: number
+  /** When set, log this exercise for the partner (proxy mode). */
+  proxyFor?: string | null
+  sessionId?: number | null
+  workoutType?: string
 }
 
 function SortableExerciseLogger(props: ExerciseLoggerProps) {
@@ -285,7 +289,7 @@ function SortableExerciseLogger(props: ExerciseLoggerProps) {
   )
 }
 
-function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx, onAudioCtxInit, dragHandleListeners, dragHandleAttributes, partnerHere, readOnly, muted, restDefaultSecs }: ExerciseLoggerProps) {
+function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx, onAudioCtxInit, dragHandleListeners, dragHandleAttributes, partnerHere, readOnly, muted, restDefaultSecs, proxyFor, sessionId, workoutType }: ExerciseLoggerProps) {
   const { state, dispatch } = useStore()
   const existing = state.sessions[dateStr]?.entries[exercise.id]
   const prev = lastSessionBefore(state, exercise.id, dateStr)
@@ -316,7 +320,17 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
   const restDefault = restDefaultSecs
 
   const saveEntry = (newSets: SetEntry[], fe: boolean) => {
-    dispatch({ type: 'LOG_EXERCISE', date: dateStr, exerciseId: exercise.id, entry: { sets: newSets, feltEasy: fe } as ExerciseEntry })
+    if (proxyFor && sessionId != null && workoutType) {
+      // Proxy mode: write to the partner's state server-side only.
+      fetch('/api/proxy-log', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId, date: dateStr, exerciseId: exercise.id, workout: workoutType, entry: { sets: newSets, feltEasy: fe } }),
+      }).catch(() => { /* offline — partner will sync later */ })
+    } else {
+      dispatch({ type: 'LOG_EXERCISE', date: dateStr, exerciseId: exercise.id, entry: { sets: newSets, feltEasy: fe } as ExerciseEntry })
+    }
   }
 
   const confirmSet = (i: number) => {
@@ -500,9 +514,12 @@ interface FocusModeProps {
   readOnly?: boolean
   muted: boolean
   restDefaultSecs: number
+  proxyFor?: string | null
+  sessionId?: number | null
+  workoutType?: string
 }
 
-function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose, readOnly, muted, restDefaultSecs }: FocusModeProps) {
+function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose, readOnly, muted, restDefaultSecs, proxyFor, sessionId, workoutType }: FocusModeProps) {
   const [idx, setIdx] = useState(startIndex)
   const ex = exercises[idx]
 
@@ -527,6 +544,9 @@ function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAu
           readOnly={readOnly}
           muted={muted}
           restDefaultSecs={restDefaultSecs}
+          proxyFor={proxyFor}
+          sessionId={sessionId}
+          workoutType={workoutType}
         />
       </div>
 
@@ -638,6 +658,8 @@ export default function WorkoutView({ username, level }: { username: string; lev
   const [partnerCandidate, setPartnerCandidate] = useState<string | null>(null)
   const [showStartModal, setShowStartModal] = useState(false)
   const [resolveNonce, setResolveNonce] = useState(0)
+  // Phase 16: proxy input — null = logging for self; string = logging for partner
+  const [proxyFor, setProxyFor] = useState<string | null>(null)
 
   const applySession = useCallback((data: { session: { id: number; mode: 'solo' | 'shared' }; participants: { username: string }[] }) => {
     setSessionId(data.session.id)
@@ -699,6 +721,7 @@ export default function WorkoutView({ username, level }: { username: string; lev
     } catch { /* ignore — re-resolve anyway */ }
     setSessionId(null)
     setSessionInfo(null)
+    setProxyFor(null)
     setResolveNonce(n => n + 1)  // re-prompt / re-create
   }, [sessionId])
 
@@ -770,6 +793,9 @@ export default function WorkoutView({ username, level }: { username: string; lev
           readOnly={readOnly}
           muted={muted}
           restDefaultSecs={restDefaultSecs}
+          proxyFor={proxyFor}
+          sessionId={sessionId}
+          workoutType={workoutType}
         />
       )}
 
@@ -835,22 +861,52 @@ export default function WorkoutView({ username, level }: { username: string; lev
               </button>
             </div>
 
-            {/* Session bar: mode + end-session affordance (Phase 13) */}
+            {/* Session bar: mode + end-session affordance (Phase 13) + proxy toggle (Phase 16) */}
             {sessionId != null && (
-              <div className="row gap-8 mb-8" style={{ alignItems: 'center', fontSize: 12 }}>
+              <div className="row gap-8 mb-8" style={{ alignItems: 'center', fontSize: 12, flexWrap: 'wrap' }}>
                 <span className="muted">
                   {sessionInfo?.mode === 'shared'
-                    ? `👥 Shared session${partnerNames.length ? ` with ${partnerNames.join(', ')}` : ''}`
-                    : '🏋️ Solo session'}
+                    ? `👥 Shared${partnerNames.length ? ` with ${partnerNames.join(', ')}` : ''}`
+                    : '🏋️ Solo'}
                 </span>
+                {/* Phase 16: proxy toggle — only in shared sessions */}
+                {sessionInfo?.mode === 'shared' && partnerNames.length > 0 && (
+                  <div className="row gap-4" style={{ alignItems: 'center' }}>
+                    <span className="muted">Log for:</span>
+                    <button
+                      className={`btn btn-sm ${!proxyFor ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setProxyFor(null)}
+                      aria-pressed={!proxyFor}
+                    >
+                      Me
+                    </button>
+                    {partnerNames.map(p => (
+                      <button
+                        key={p}
+                        className={`btn btn-sm ${proxyFor === p ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setProxyFor(p)}
+                        aria-pressed={proxyFor === p}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <button
                   className="btn btn-secondary btn-sm"
                   style={{ marginLeft: 'auto' }}
                   onClick={endCurrentSession}
                   aria-label="End session"
                 >
-                  End session
+                  End
                 </button>
+              </div>
+            )}
+            {proxyFor && (
+              <div className="card mb-8" role="note" style={{ borderColor: 'var(--accent)', padding: '6px 10px' }}>
+                <span style={{ fontSize: 12, color: 'var(--accent)' }}>
+                  Logging for <strong>{proxyFor}</strong> — your own data is unaffected.
+                </span>
               </div>
             )}
 
@@ -896,6 +952,9 @@ export default function WorkoutView({ username, level }: { username: string; lev
                     readOnly={readOnly}
                     muted={muted}
                     restDefaultSecs={restDefaultSecs}
+                    proxyFor={proxyFor}
+                    sessionId={sessionId}
+                    workoutType={workoutType}
                   />
                 ))}
               </SortableContext>
