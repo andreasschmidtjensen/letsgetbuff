@@ -46,13 +46,23 @@ function makeDb() {
       schema_version INTEGER NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE user_privilege (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id),
+      level TEXT NOT NULL DEFAULT 'user' CHECK (level IN ('none','viewer','user','admin')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `)
   return db
 }
 
-function addUser(db, username) {
+function addUser(db, username, level) {
   db.prepare("INSERT INTO users (cwa_username) VALUES (?) ON CONFLICT DO NOTHING").run(username)
-  return db.prepare("SELECT id FROM users WHERE cwa_username = ?").get(username).id
+  const id = db.prepare("SELECT id FROM users WHERE cwa_username = ?").get(username).id
+  if (level) {
+    db.prepare(`INSERT INTO user_privilege (user_id, level) VALUES (?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET level = excluded.level`).run(id, level)
+  }
+  return id
 }
 
 async function buildServer(db) {
@@ -78,8 +88,8 @@ async function buildServer(db) {
   return app
 }
 
-function makeToken(app, userId, username) {
-  return app.jwt.sign({ sub: userId, username })
+function makeToken(app, userId, username, level) {
+  return app.jwt.sign(level ? { sub: userId, username, level } : { sub: userId, username })
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -193,6 +203,88 @@ test('GET returns 401 without a session cookie', async (t) => {
 
   const res = await app.inject({ method: 'GET', url: '/api/state' })
   assert.equal(res.statusCode, 401)
+
+  await app.close()
+})
+
+// ── Phase 11: privilege gating against the real api.ts ───────────────────────
+
+const VIEWER_STATE = { schemaVersion: 2, startDate: '2026-01-01', skippedWeeks: [], sessions: {}, metrics: {}, milestones: {} }
+
+test('viewer is blocked from PUT /api/state (403) but may GET', async (t) => {
+  const db = makeDb()
+  const uid = addUser(db, 'val', 'viewer')
+  const app = await buildServer(db)
+  const token = makeToken(app, uid, 'val', 'viewer')
+
+  const putRes = await app.inject({
+    method: 'PUT', url: '/api/state', cookies: { session: token },
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: VIEWER_STATE }),
+  })
+  assert.equal(putRes.statusCode, 403)
+
+  const getRes = await app.inject({ method: 'GET', url: '/api/state', cookies: { session: token } })
+  assert.equal(getRes.statusCode, 200)
+
+  await app.close()
+})
+
+test('user level may PUT /api/state (gate only blocks viewer)', async (t) => {
+  const db = makeDb()
+  const uid = addUser(db, 'ulla', 'user')
+  const app = await buildServer(db)
+  const token = makeToken(app, uid, 'ulla', 'user')
+
+  const putRes = await app.inject({
+    method: 'PUT', url: '/api/state', cookies: { session: token },
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: VIEWER_STATE }),
+  })
+  assert.equal(putRes.statusCode, 200)
+
+  await app.close()
+})
+
+test('GET /api/admin/users returns 403 for non-admin, lists for admin', async (t) => {
+  const db = makeDb()
+  const adminId = addUser(db, 'jacob', 'admin')
+  addUser(db, 'partner', 'user')
+  const app = await buildServer(db)
+
+  const userToken = makeToken(app, addUser(db, 'plain', 'user'), 'plain', 'user')
+  const denied = await app.inject({ method: 'GET', url: '/api/admin/users', cookies: { session: userToken } })
+  assert.equal(denied.statusCode, 403)
+
+  const adminToken = makeToken(app, adminId, 'jacob', 'admin')
+  const ok = await app.inject({ method: 'GET', url: '/api/admin/users', cookies: { session: adminToken } })
+  assert.equal(ok.statusCode, 200)
+  const body = JSON.parse(ok.body)
+  const jacob = body.users.find(u => u.username === 'jacob')
+  assert.equal(jacob.level, 'admin')
+
+  await app.close()
+})
+
+test('admin PUT level changes the other account; last-admin demotion blocked', async (t) => {
+  const db = makeDb()
+  const adminId = addUser(db, 'jacob', 'admin')
+  addUser(db, 'partner', 'user')
+  const app = await buildServer(db)
+  const adminToken = makeToken(app, adminId, 'jacob', 'admin')
+
+  // Change partner → viewer
+  const change = await app.inject({
+    method: 'PUT', url: '/api/admin/users/partner/level', cookies: { session: adminToken },
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ level: 'viewer' }),
+  })
+  assert.equal(change.statusCode, 200)
+  assert.equal(JSON.parse(change.body).level, 'viewer')
+
+  // jacob is the last admin — demoting self must be rejected
+  const selfDemote = await app.inject({
+    method: 'PUT', url: '/api/admin/users/jacob/level', cookies: { session: adminToken },
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ level: 'user' }),
+  })
+  assert.equal(selfDemote.statusCode, 409)
 
   await app.close()
 })

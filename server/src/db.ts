@@ -21,7 +21,7 @@ export type Db = DatabaseSync
 
 // ---- Migration ladder -------------------------------------------------------
 
-const CURRENT_DB_VERSION = 2
+const CURRENT_DB_VERSION = 3
 
 type Migration = (db: DatabaseSync) => void
 
@@ -68,6 +68,18 @@ const MIGRATIONS: Record<number, Migration> = {
         status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
         proposed_at TEXT NOT NULL DEFAULT (datetime('now')),
         reviewed_at TEXT
+      );
+    `)
+  },
+  3: (db) => {
+    // Phase 11: per-account privilege level (GYMN-only, never written to CWA's app.db).
+    // none < viewer < user < admin. First-ever login bootstraps to 'admin' (see auth.ts).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS user_privilege (
+        user_id    INTEGER PRIMARY KEY REFERENCES users(id),
+        level      TEXT NOT NULL DEFAULT 'user'
+                   CHECK (level IN ('none','viewer','user','admin')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `)
   },

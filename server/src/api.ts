@@ -18,11 +18,13 @@ import { EMPTY_STATE, SCHEMA_VERSION } from '@letsgetbuff/shared'
 import type { AppState, Plan } from '@letsgetbuff/shared'
 import type { Db } from './db.js'
 import { proposeExercise, validateExerciseDef, isAiConfigured, MISSING_KEY_MESSAGE } from './claude.js'
+import { requirePrivilege, type Privilege } from './auth.js'
 
-// Shape attached by authGuard (Phase 3)
+// Shape attached by authGuard (Phase 3; level added Phase 11)
 interface JwtUser {
   sub: number
   username: string
+  level?: Privilege
 }
 
 function authedUser(req: FastifyRequest): JwtUser {
@@ -83,7 +85,11 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       },
     },
     async (req: FastifyRequest<{ Body: { state: AppState } }>, reply: FastifyReply) => {
-      const { username } = authedUser(req)
+      const { username, level } = authedUser(req)
+      // viewer is read-only — they may GET state but never write it.
+      if (level === 'viewer') {
+        return reply.code(403).send({ error: 'Viewers cannot modify workout data' })
+      }
       const userId = getUserId(db, username)
       const { state } = req.body
       if (typeof state !== 'object' || state === null) {
@@ -220,6 +226,77 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       }
       db.prepare(`UPDATE plan_proposals SET status = 'rejected', reviewed_at = ? WHERE id = ?`).run(new Date().toISOString(), id)
       return reply.send({ ok: true })
+    },
+  )
+
+  // ── Admin: user privilege management (Phase 11, admin-only) ─────────────────
+  const VALID_LEVELS: Privilege[] = ['none', 'viewer', 'user', 'admin']
+
+  // GET /api/admin/users → all accounts with their level + created_at
+  app.get(
+    '/api/admin/users',
+    { preHandler: requirePrivilege('admin') },
+    async (_req: FastifyRequest, reply: FastifyReply) => {
+      const rows = db.prepare(`
+        SELECT u.cwa_username AS username,
+               COALESCE(p.level, 'user') AS level,
+               u.created_at AS createdAt
+        FROM users u
+        LEFT JOIN user_privilege p ON p.user_id = u.id
+        ORDER BY u.created_at ASC
+      `).all() as { username: string; level: Privilege; createdAt: string }[]
+      return reply.send({ users: rows })
+    },
+  )
+
+  // PUT /api/admin/users/:username/level → change an account's level
+  app.put<{ Params: { username: string }; Body: { level: Privilege } }>(
+    '/api/admin/users/:username/level',
+    {
+      preHandler: requirePrivilege('admin'),
+      schema: {
+        body: {
+          type: 'object',
+          required: ['level'],
+          properties: { level: { type: 'string', enum: VALID_LEVELS } },
+        },
+      },
+    },
+    async (req: FastifyRequest<{ Params: { username: string }; Body: { level: Privilege } }>, reply: FastifyReply) => {
+      const { username: target } = req.params
+      const { level } = req.body
+      if (!VALID_LEVELS.includes(level)) {
+        return reply.code(400).send({ error: `Invalid level: ${level}` })
+      }
+      const targetRow = db
+        .prepare('SELECT id FROM users WHERE cwa_username = ?')
+        .get(target) as { id: number } | undefined
+      if (!targetRow) return reply.code(404).send({ error: `Unknown account: ${target}` })
+
+      const currentLevel = (
+        db.prepare("SELECT COALESCE(level, 'user') AS level FROM user_privilege WHERE user_id = ?").get(targetRow.id) as
+          | { level: Privilege }
+          | undefined
+      )?.level ?? 'user'
+
+      // Prevent removing the last admin (self-lockout guard).
+      if (currentLevel === 'admin' && level !== 'admin') {
+        const adminCount = (
+          db.prepare("SELECT COUNT(*) AS n FROM user_privilege WHERE level = 'admin'").get() as { n: number }
+        ).n
+        if (adminCount <= 1) {
+          return reply.code(409).send({ error: 'Cannot demote the last admin' })
+        }
+      }
+
+      const now = new Date().toISOString()
+      db.prepare(`
+        INSERT INTO user_privilege (user_id, level, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT (user_id) DO UPDATE SET level = excluded.level, updated_at = excluded.updated_at
+      `).run(targetRow.id, level, now)
+
+      return reply.send({ ok: true, username: target, level })
     },
   )
 }

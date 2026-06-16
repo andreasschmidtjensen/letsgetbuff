@@ -8,6 +8,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash, pbkdf2Sync, scryptSync, timingSafeEqual } from 'node:crypto'
+import { DatabaseSync } from 'node:sqlite'
 
 function verifyWerkzeugHash(storedHash, password) {
   try {
@@ -79,4 +80,132 @@ test('malformed hash returns false', () => {
   assert.equal(verifyWerkzeugHash('notahash', CORRECT_PW), false)
   assert.equal(verifyWerkzeugHash('', CORRECT_PW), false)
   assert.equal(verifyWerkzeugHash('unknown:method$salt$hash', CORRECT_PW), false)
+})
+
+// ---------------------------------------------------------------------------
+// Phase 11 — Privilege levels. Self-contained: mirrors ensureUserAndPrivilege
+// (auth.ts), the login none-gate (auth.ts), and the admin level-change guard
+// (api.ts). Run against an in-memory SQLite matching the v3 schema.
+// ---------------------------------------------------------------------------
+
+function makePrivDb() {
+  const db = new DatabaseSync(':memory:')
+  db.exec(`
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cwa_username TEXT UNIQUE NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE user_privilege (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id),
+      level TEXT NOT NULL DEFAULT 'user' CHECK (level IN ('none','viewer','user','admin')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `)
+  return db
+}
+
+// mirror of server/src/auth.ts ensureUserAndPrivilege
+function ensureUserAndPrivilege(db, username) {
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    const priorCount = db.prepare('SELECT COUNT(*) AS n FROM users').get().n
+    db.prepare('INSERT INTO users (cwa_username) VALUES (?) ON CONFLICT(cwa_username) DO NOTHING').run(username)
+    const { id } = db.prepare('SELECT id FROM users WHERE cwa_username = ?').get(username)
+    const existing = db.prepare('SELECT level FROM user_privilege WHERE user_id = ?').get(id)
+    let level
+    if (existing) {
+      level = existing.level
+    } else {
+      level = priorCount === 0 ? 'admin' : 'user'
+      db.prepare('INSERT INTO user_privilege (user_id, level) VALUES (?, ?)').run(id, level)
+    }
+    db.exec('COMMIT')
+    return { id, level }
+  } catch (err) {
+    db.exec('ROLLBACK')
+    throw err
+  }
+}
+
+// mirror of the api.ts last-admin demotion guard
+function changeLevel(db, target, level) {
+  const targetRow = db.prepare('SELECT id FROM users WHERE cwa_username = ?').get(target)
+  if (!targetRow) return { code: 404, error: `Unknown account: ${target}` }
+  const currentLevel =
+    db.prepare("SELECT COALESCE(level, 'user') AS level FROM user_privilege WHERE user_id = ?").get(targetRow.id)?.level ?? 'user'
+  if (currentLevel === 'admin' && level !== 'admin') {
+    const adminCount = db.prepare("SELECT COUNT(*) AS n FROM user_privilege WHERE level = 'admin'").get().n
+    if (adminCount <= 1) return { code: 409, error: 'Cannot demote the last admin' }
+  }
+  db.prepare(`
+    INSERT INTO user_privilege (user_id, level) VALUES (?, ?)
+    ON CONFLICT (user_id) DO UPDATE SET level = excluded.level
+  `).run(targetRow.id, level)
+  return { ok: true, username: target, level }
+}
+
+test('first-ever login is bootstrapped to admin', () => {
+  const db = makePrivDb()
+  const { level } = ensureUserAndPrivilege(db, 'jacob')
+  assert.equal(level, 'admin')
+})
+
+test('second new account defaults to user', () => {
+  const db = makePrivDb()
+  ensureUserAndPrivilege(db, 'jacob')           // admin (bootstrap)
+  const { level } = ensureUserAndPrivilege(db, 'partner')
+  assert.equal(level, 'user')
+})
+
+test('existing account keeps its stored level on re-login', () => {
+  const db = makePrivDb()
+  const first = ensureUserAndPrivilege(db, 'jacob')
+  assert.equal(first.level, 'admin')
+  const second = ensureUserAndPrivilege(db, 'jacob')  // re-login, no new row
+  assert.equal(second.level, 'admin')
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, 1)
+})
+
+test('none level blocks login (no cookie issued)', () => {
+  const db = makePrivDb()
+  ensureUserAndPrivilege(db, 'jacob')                 // admin
+  const partner = ensureUserAndPrivilege(db, 'partner')
+  changeLevel(db, 'partner', 'none')                  // admin disables partner
+  // Re-login resolves the stored level; the handler returns 403 for 'none'.
+  const { level } = ensureUserAndPrivilege(db, 'partner')
+  assert.equal(level, 'none')
+  const wouldIssueCookie = level !== 'none'
+  assert.equal(wouldIssueCookie, false)
+  assert.ok(partner) // partner row still exists
+})
+
+test('admin can change the other account level', () => {
+  const db = makePrivDb()
+  ensureUserAndPrivilege(db, 'jacob')         // admin
+  ensureUserAndPrivilege(db, 'partner')       // user
+  const r = changeLevel(db, 'partner', 'viewer')
+  assert.ok(r.ok)
+  assert.equal(r.level, 'viewer')
+  const stored = db.prepare("SELECT level FROM user_privilege p JOIN users u ON u.id = p.user_id WHERE u.cwa_username = 'partner'").get()
+  assert.equal(stored.level, 'viewer')
+})
+
+test('last-admin self-demotion is rejected', () => {
+  const db = makePrivDb()
+  ensureUserAndPrivilege(db, 'jacob')         // the only admin
+  ensureUserAndPrivilege(db, 'partner')       // user
+  const r = changeLevel(db, 'jacob', 'user')
+  assert.equal(r.code, 409)
+  assert.ok(/last admin/i.test(r.error))
+})
+
+test('an admin can be demoted once a second admin exists', () => {
+  const db = makePrivDb()
+  ensureUserAndPrivilege(db, 'jacob')         // admin
+  ensureUserAndPrivilege(db, 'partner')       // user
+  changeLevel(db, 'partner', 'admin')         // now two admins
+  const r = changeLevel(db, 'jacob', 'user')  // safe to demote one
+  assert.ok(r.ok)
+  assert.equal(r.level, 'user')
 })

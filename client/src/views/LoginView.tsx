@@ -4,9 +4,10 @@
  */
 
 import { useState, FormEvent } from 'react'
+import type { Privilege } from '@letsgetbuff/shared'
 
 interface Props {
-  onLogin: (username: string) => void
+  onLogin: (username: string, level: Privilege) => void
 }
 
 export default function LoginView({ onLogin }: Props) {
@@ -27,7 +28,7 @@ export default function LoginView({ onLogin }: Props) {
       })
       if (res.ok) {
         const data = await res.json()
-        onLogin(data.username)
+        onLogin(data.username, (data.level as Privilege) ?? 'user')
       } else {
         const data = await res.json().catch(() => ({}))
         setError(data.error ?? 'Login failed')

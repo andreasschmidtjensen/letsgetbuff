@@ -55,7 +55,7 @@ async function start() {
     })
   })
 
-  app.get('/api/health', async () => ({ ok: true, version: 10 }))
+  app.get('/api/health', async () => ({ ok: true, version: 11 }))
 
   if (!config.isDev) {
     const staticDir = path.isAbsolute(config.staticDir)

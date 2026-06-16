@@ -15,6 +15,67 @@ import { DatabaseSync } from 'node:sqlite'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { config } from './config.js'
 import type { Db } from './db.js'
+import type { Privilege } from '@letsgetbuff/shared'
+
+// ── Privilege levels (Phase 11) ─────────────────────────────────────────────
+
+export type { Privilege }
+
+// Lowest → highest. Index = rank for requirePrivilege comparisons.
+export const PRIVILEGE_LEVELS: Privilege[] = ['none', 'viewer', 'user', 'admin']
+
+function privilegeRank(level: Privilege): number {
+  return PRIVILEGE_LEVELS.indexOf(level)
+}
+
+/**
+ * Ensure a `users` row + a `user_privilege` row exist for this CWA username,
+ * and return the effective level. Bootstrap rule (two-user friendly): the very
+ * first account ever to log in becomes `admin`; every later new account defaults
+ * to `user`. Existing accounts keep their stored level. Runs in a single
+ * transaction so concurrent first-logins can't both claim admin.
+ *
+ * Privilege lives only in buff.db — CWA's app.db is never written.
+ */
+export function ensureUserAndPrivilege(
+  buffDb: Db,
+  username: string,
+): { id: number; level: Privilege } {
+  buffDb.exec('BEGIN IMMEDIATE')
+  try {
+    const priorCount = (
+      buffDb.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }
+    ).n
+
+    buffDb
+      .prepare('INSERT INTO users (cwa_username) VALUES (?) ON CONFLICT(cwa_username) DO NOTHING')
+      .run(username)
+
+    const { id } = buffDb
+      .prepare('SELECT id FROM users WHERE cwa_username = ?')
+      .get(username) as { id: number }
+
+    const existing = buffDb
+      .prepare('SELECT level FROM user_privilege WHERE user_id = ?')
+      .get(id) as { level: Privilege } | undefined
+
+    let level: Privilege
+    if (existing) {
+      level = existing.level
+    } else {
+      level = priorCount === 0 ? 'admin' : 'user'
+      buffDb
+        .prepare('INSERT INTO user_privilege (user_id, level) VALUES (?, ?)')
+        .run(id, level)
+    }
+
+    buffDb.exec('COMMIT')
+    return { id, level }
+  } catch (err) {
+    buffDb.exec('ROLLBACK')
+    throw err
+  }
+}
 
 // ── Werkzeug hash verification ──────────────────────────────────────────────
 
@@ -147,21 +208,17 @@ export async function loginHandler(
     return reply.code(401).send({ error: 'Invalid credentials' })
   }
 
-  // Lazily upsert into local users table
-  buffDb
-    .prepare(
-      `INSERT INTO users (cwa_username) VALUES (?)
-       ON CONFLICT(cwa_username) DO NOTHING`,
-    )
-    .run(cwaUser.name)
+  // Lazily upsert into local users table + assign/read privilege (bootstrap admin).
+  const { id, level } = ensureUserAndPrivilege(buffDb, cwaUser.name)
 
-  const localUser = buffDb
-    .prepare('SELECT id FROM users WHERE cwa_username = ?')
-    .get(cwaUser.name) as { id: number }
+  // Gate: `none` may have valid CWA credentials but cannot use GYMN. No cookie.
+  if (level === 'none') {
+    return reply.code(403).send({ error: 'Access not enabled for this account' })
+  }
 
-  // Sign JWT and set HttpOnly, SameSite=Lax cookie
+  // Sign JWT (carries level so the guard needn't re-query) and set HttpOnly cookie.
   const token = (this as any).jwt.sign(
-    { sub: localUser.id, username: cwaUser.name },
+    { sub: id, username: cwaUser.name, level },
     { expiresIn: '30d' },
   )
 
@@ -172,7 +229,7 @@ export async function loginHandler(
       path: '/',
       maxAge: 30 * 24 * 60 * 60, // 30 days in seconds
     })
-    .send({ ok: true, username: cwaUser.name })
+    .send({ ok: true, username: cwaUser.name, level })
 }
 
 export async function logoutHandler(
@@ -187,9 +244,29 @@ export async function meHandler(
   reply: FastifyReply,
 ): Promise<void> {
   // @ts-ignore — user is attached by verifyJWT preHandler
-  const user = req.user as { sub: number; username: string } | undefined
+  const user = req.user as { sub: number; username: string; level?: Privilege } | undefined
   if (!user) return reply.code(401).send({ error: 'Not authenticated' })
-  reply.send({ id: user.sub, username: user.username })
+  // Older tokens (pre-Phase 11) lack a level — treat as 'user' so existing
+  // sessions keep working until the next login refreshes the token.
+  reply.send({ id: user.sub, username: user.username, level: user.level ?? 'user' })
+}
+
+// ── Privilege guard (Phase 11) ──────────────────────────────────────────────
+
+/**
+ * preHandler factory: rejects with 403 unless the caller's JWT level is ≥ `min`.
+ * Level is read from the JWT (set at login), so a level change takes effect on
+ * the user's next login / token refresh — acceptable per the backlog. Apply only
+ * after `authGuard` has attached `req.user`.
+ */
+export function requirePrivilege(min: Privilege) {
+  return async function (req: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const user = (req as FastifyRequest & { user?: { level?: Privilege } }).user
+    const level: Privilege = user?.level ?? 'user'
+    if (privilegeRank(level) < privilegeRank(min)) {
+      return reply.code(403).send({ error: 'Insufficient privilege' })
+    }
+  }
 }
 
 // ── Auth preHandler (guards /api/* except public routes) ───────────────────

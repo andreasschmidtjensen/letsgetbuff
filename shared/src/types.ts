@@ -47,3 +47,7 @@ export const EMPTY_STATE: AppState = {
 }
 
 export type Tab = 'home' | 'workout' | 'metrics' | 'milestones' | 'history' | 'settings'
+
+// Per-account privilege level (Phase 11). Lives in buff.db, never in CWA.
+// Lowest → highest: none < viewer < user < admin.
+export type Privilege = 'none' | 'viewer' | 'user' | 'admin'

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { StoreProvider } from './store/store'
-import { Tab } from '@letsgetbuff/shared'
+import { Tab, Privilege } from '@letsgetbuff/shared'
 import HomeView from './views/HomeView'
 import WorkoutView from './views/WorkoutView'
 import MetricsView from './views/MetricsView'
@@ -24,6 +24,7 @@ type AuthState = 'checking' | 'unauthenticated' | 'authenticated'
 function useAuth() {
   const [authState, setAuthState] = useState<AuthState>('checking')
   const [username, setUsername] = useState<string | null>(null)
+  const [level, setLevel] = useState<Privilege>('user')
 
   useEffect(() => {
     fetch('/api/me', { credentials: 'include' })
@@ -31,6 +32,7 @@ function useAuth() {
         if (res.ok) {
           const data = await res.json()
           setUsername(data.username)
+          setLevel((data.level as Privilege) ?? 'user')
           setAuthState('authenticated')
         } else {
           setAuthState('unauthenticated')
@@ -39,21 +41,23 @@ function useAuth() {
       .catch(() => setAuthState('unauthenticated'))
   }, [])
 
-  function onLogin(name: string) {
+  function onLogin(name: string, lvl: Privilege) {
     setUsername(name)
+    setLevel(lvl ?? 'user')
     setAuthState('authenticated')
   }
 
   async function onLogout() {
     await fetch('/api/logout', { method: 'POST', credentials: 'include' })
     setUsername(null)
+    setLevel('user')
     setAuthState('unauthenticated')
   }
 
-  return { authState, username, onLogin, onLogout }
+  return { authState, username, level, onLogin, onLogout }
 }
 
-function AppInner({ username, onLogout }: { username: string; onLogout: () => void }) {
+function AppInner({ username, level, onLogout }: { username: string; level: Privilege; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('home')
 
   return (
@@ -66,11 +70,11 @@ function AppInner({ username, onLogout }: { username: string; onLogout: () => vo
       </header>
       <main className="app-main">
         {tab === 'home'      && <HomeView onNavigate={setTab} />}
-        {tab === 'workout'   && <WorkoutView username={username} />}
+        {tab === 'workout'   && <WorkoutView username={username} level={level} />}
         {tab === 'history'   && <HistoryView />}
         {tab === 'metrics'   && <MetricsView />}
         {tab === 'milestones'&& <MilestonesView />}
-        {tab === 'settings'  && <SettingsView onLogout={onLogout} />}
+        {tab === 'settings'  && <SettingsView onLogout={onLogout} level={level} />}
       </main>
       <nav className="app-nav">
         {TABS.map(t => (
@@ -88,7 +92,7 @@ function AppInner({ username, onLogout }: { username: string; onLogout: () => vo
 }
 
 export default function App() {
-  const { authState, username, onLogin, onLogout } = useAuth()
+  const { authState, username, level, onLogin, onLogout } = useAuth()
 
   if (authState === 'checking') {
     return (
@@ -107,7 +111,7 @@ export default function App() {
 
   return (
     <StoreProvider username={username!}>
-      <AppInner username={username!} onLogout={onLogout} />
+      <AppInner username={username!} level={level} onLogout={onLogout} />
     </StoreProvider>
   )
 }

@@ -25,6 +25,7 @@ import { todayKey, keyToDate } from '../lib/date'
 import { getWorkoutExercises, getWorkout, ExerciseDef } from '@letsgetbuff/shared'
 import { suggestNextWeight, repTargetFor, repBandFor } from '@letsgetbuff/shared'
 import { ExerciseEntry, SetEntry, Session } from '@letsgetbuff/shared'
+import type { Privilege } from '@letsgetbuff/shared'
 
 function beep(ctx: AudioContext, freq = 880, duration = 0.12, vol = 0.4) {
   const osc = ctx.createOscillator()
@@ -237,6 +238,7 @@ interface ExerciseLoggerProps {
   dragHandleListeners?: Record<string, unknown>
   dragHandleAttributes?: DraggableAttributes
   partnerHere?: string
+  readOnly?: boolean
 }
 
 function SortableExerciseLogger(props: ExerciseLoggerProps & { partnerHere?: string }) {
@@ -260,7 +262,7 @@ function SortableExerciseLogger(props: ExerciseLoggerProps & { partnerHere?: str
   )
 }
 
-function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx, onAudioCtxInit, dragHandleListeners, dragHandleAttributes, partnerHere }: ExerciseLoggerProps) {
+function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx, onAudioCtxInit, dragHandleListeners, dragHandleAttributes, partnerHere, readOnly }: ExerciseLoggerProps) {
   const { state, dispatch } = useStore()
   const existing = state.sessions[dateStr]?.entries[exercise.id]
   const prev = lastSessionBefore(state, exercise.id, dateStr)
@@ -295,6 +297,7 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
   }
 
   const confirmSet = (i: number) => {
+    if (readOnly) return  // viewers cannot log — server also rejects PUT /api/state
     const newConfirmed = confirmed.map((c, idx) => idx === i ? true : c)
     setConfirmed(newConfirmed)
     saveEntry(sets, feltEasy)
@@ -422,7 +425,7 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
                   )}
                   <input type="number" className="input-sm" placeholder="RIR"
                     value={s.rir ?? ''} onChange={e => updateSet(i, 'rir', e.target.value)} min={0} max={10} aria-label="Reps in reserve" />
-                  <button className="btn-check" onClick={() => { setEditing(null); confirmSet(i) }} aria-label="Confirm set">✓</button>
+                  <button className="btn-check" onClick={() => { setEditing(null); confirmSet(i) }} aria-label="Confirm set" disabled={readOnly}>✓</button>
                 </div>
               ) : (
                 <div className="set-inputs" role="group" aria-label={`Set ${i + 1} inputs`}>
@@ -439,7 +442,7 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
                   )}
                   <input type="number" className="input-sm" placeholder="RIR"
                     value={s.rir ?? ''} onChange={e => updateSet(i, 'rir', e.target.value)} min={0} max={10} aria-label="Reps in reserve" />
-                  <button className="btn-check" onClick={() => confirmSet(i)} aria-label={`Confirm set ${i + 1}`}>✓</button>
+                  <button className="btn-check" onClick={() => confirmSet(i)} aria-label={`Confirm set ${i + 1}`} disabled={readOnly}>✓</button>
                 </div>
               )}
             </div>
@@ -473,9 +476,10 @@ interface FocusModeProps {
   audioCtx: AudioContext | null
   onAudioCtxInit: () => AudioContext
   onClose: () => void
+  readOnly?: boolean
 }
 
-function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose }: FocusModeProps) {
+function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose, readOnly }: FocusModeProps) {
   const [idx, setIdx] = useState(startIndex)
   const ex = exercises[idx]
 
@@ -497,6 +501,7 @@ function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAu
           programWeek={programWeek}
           audioCtx={audioCtx}
           onAudioCtxInit={onAudioCtxInit}
+          readOnly={readOnly}
         />
       </div>
 
@@ -524,7 +529,8 @@ const WORKOUT_OPTIONS: { value: Session['workout']; label: string }[] = [
   { value: 'rest', label: 'Rest' },
 ]
 
-export default function WorkoutView({ username }: { username: string }) {
+export default function WorkoutView({ username, level }: { username: string; level?: Privilege }) {
+  const readOnly = level === 'viewer'
   const { state, dispatch, syncStatus } = useStore()
   const todayStr = todayKey()
   const [dateStr, setDateStr] = useState(todayStr)
@@ -630,10 +636,18 @@ export default function WorkoutView({ username }: { username: string }) {
           audioCtx={audioCtxRef.current}
           onAudioCtxInit={initAudio}
           onClose={() => setFocusIndex(null)}
+          readOnly={readOnly}
         />
       )}
 
       <div>
+        {readOnly && (
+          <div className="card mb-12" role="note" style={{ borderColor: 'var(--text-muted)' }}>
+            <span className="muted" style={{ fontSize: 13 }}>
+              👁 View-only access — you can browse workouts but logging is disabled.
+            </span>
+          </div>
+        )}
         <div className="card mb-12">
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
             <div className="card-title" style={{ margin: 0 }}>Session date</div>
@@ -718,6 +732,7 @@ export default function WorkoutView({ username }: { username: string }) {
                     audioCtx={audioCtxRef.current}
                     onAudioCtxInit={initAudio}
                     partnerHere={[...partnerPresence.entries()].find(([, eid]) => eid === ex.id)?.[0]}
+                    readOnly={readOnly}
                   />
                 ))}
               </SortableContext>
