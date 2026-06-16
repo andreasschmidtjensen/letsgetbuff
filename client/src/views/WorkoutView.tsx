@@ -51,6 +51,26 @@ function playDoneSound(ctx: AudioContext) {
   setTimeout(() => beep(ctx, 1100, 0.18, 0.3), 120)
 }
 
+// "45s", "10 min", or "1:30" — friendly label for a duration in seconds.
+function formatDuration(secs: number): string {
+  if (secs >= 60) {
+    const m = Math.floor(secs / 60)
+    const s = secs % 60
+    return s === 0 ? `${m} min` : `${m}:${s.toString().padStart(2, '0')}`
+  }
+  return `${secs}s`
+}
+
+// Parse a free-text warmup ("10-minute elliptical") into a label + duration so it
+// can be run as a timed warm-up slide in focus mode. Defaults to 5 min if no number.
+function parseWarmup(raw: string | undefined): { label: string; seconds: number } | null {
+  const text = raw?.trim()
+  if (!text) return null
+  const m = text.match(/(\d+)\s*-?\s*min/i)
+  const minutes = m ? parseInt(m[1], 10) : 5
+  return { label: text, seconds: Math.max(30, minutes * 60) }
+}
+
 function SessionTimer({ startedAt }: { startedAt: number }) {
   const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
@@ -249,6 +269,52 @@ function ExerciseTimer({ targetSecs, onComplete, onCancel, audioCtx, onAudioCtxI
           <button className="btn btn-secondary" style={{ flex: 1 }} onClick={onCancel} aria-label="Cancel timer">Cancel</button>
           <button className="btn btn-primary" style={{ flex: 2 }} onClick={stopEarly} aria-label="Log time and finish set">Done</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+interface WarmupCardProps {
+  warmup: { label: string; seconds: number }
+  done: boolean
+  onDone: () => void
+  audioCtx: AudioContext | null
+  onAudioCtxInit: () => AudioContext
+  muted: boolean
+}
+
+// Warm-up slide for focus mode: the workout's cardio warm-up as a startable
+// count-down timer. Not logged — it just gates the move to the first exercise.
+function WarmupCard({ warmup, done, onDone, audioCtx, onAudioCtxInit, muted }: WarmupCardProps) {
+  const [timing, setTiming] = useState(false)
+  return (
+    <div className={`card exercise-card${done ? ' exercise-done' : ''}`} style={{ marginBottom: 10 }}>
+      {timing && (
+        <ExerciseTimer
+          targetSecs={warmup.seconds}
+          onComplete={() => { setTiming(false); onDone() }}
+          onCancel={() => setTiming(false)}
+          audioCtx={audioCtx}
+          onAudioCtxInit={onAudioCtxInit}
+          muted={muted}
+        />
+      )}
+      <div className="row gap-8 mb-8">
+        <span className="exercise-name">Warm-up</span>
+        {done && <span className="badge badge-green" style={{ marginLeft: 'auto' }}>done</span>}
+      </div>
+      <p className="muted" style={{ fontSize: 15, marginBottom: 12 }}>{warmup.label}</p>
+      <div className="set-inputs" role="group" aria-label="Warm-up timer">
+        <button
+          className="btn btn-primary btn-start-timer"
+          onClick={() => setTiming(true)}
+          aria-label={`Start ${formatDuration(warmup.seconds)} warm-up timer`}
+        >
+          ▶ Start {formatDuration(warmup.seconds)}
+        </button>
+        {!done && (
+          <button className="btn-check" onClick={onDone} aria-label="Mark warm-up done">✓</button>
+        )}
       </div>
     </div>
   )
@@ -639,7 +705,7 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
                     aria-label={`Start ${s.seconds ?? target.seconds} second timer for set ${i + 1}`}
                     disabled={readOnly}
                   >
-                    ▶ Start {s.seconds ?? target.seconds}s
+                    ▶ Start {formatDuration(s.seconds ?? target.seconds ?? 0)}
                   </button>
                   <input type="number" className="input-sm" placeholder="sec"
                     value={s.seconds ?? ''} onChange={e => updateSet(i, 'seconds', e.target.value)} min={0} aria-label="Seconds (manual entry)" />
@@ -700,93 +766,120 @@ interface FocusModeProps {
   refreshPartner?: () => void
   /** Broadcast which exercise is focused (presence for a two-device shared session). */
   sendPresence?: (exerciseId: string) => void
+  /** Optional timed warm-up shown as the first slide. */
+  warmup?: { label: string; seconds: number } | null
 }
 
-function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose, readOnly, muted, restDefaultSecs, sessionId, workoutType, partnerName, partnerState, refreshPartner, sendPresence }: FocusModeProps) {
-  const { state } = useStore()
-  // Track the focused exercise by id (not position) so a live reorder can't teleport us.
-  const [currentId, setCurrentId] = useState(exercises[startIndex]?.id ?? exercises[0]?.id)
-  let idx = exercises.findIndex(e => e.id === currentId)
-  if (idx === -1) idx = Math.min(startIndex, exercises.length - 1)
-  const ex = exercises[idx]
+const WARMUP_SLIDE = '__warmup__'
 
-  // Broadcast presence whenever the focused exercise changes.
+function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose, readOnly, muted, restDefaultSecs, sessionId, workoutType, partnerName, partnerState, refreshPartner, sendPresence, warmup }: FocusModeProps) {
+  const { state } = useStore()
+  // Slides = optional warm-up + the plan exercises, navigated by id so a live
+  // reorder can't teleport us.
+  const slides = warmup ? [WARMUP_SLIDE, ...exercises.map(e => e.id)] : exercises.map(e => e.id)
+  const [currentId, setCurrentId] = useState(slides[Math.min(Math.max(startIndex, 0), slides.length - 1)] ?? slides[0])
+  const [warmupDone, setWarmupDone] = useState(false)
+
+  let idx = slides.indexOf(currentId)
+  if (idx === -1) idx = Math.min(startIndex, slides.length - 1)
+  const onWarmup = slides[idx] === WARMUP_SLIDE
+  const ex = onWarmup ? null : exercises.find(e => e.id === slides[idx])
+
+  // Broadcast presence whenever the focused exercise changes (not for the warm-up).
   useEffect(() => {
     if (ex) sendPresence?.(ex.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ex?.id])
+  }, [currentId])
 
-  if (!ex) return null
+  if (!onWarmup && !ex) return null
 
   const shared = Boolean(partnerName && partnerState)
-  const selfDone = exerciseDoneIn(state.sessions, dateStr, ex, programWeek)
-  const partnerDone = shared ? exerciseDoneIn(partnerState!.sessions, dateStr, ex, programWeek) : true
-  const allDone = selfDone && partnerDone
+  let allDone: boolean
+  if (onWarmup) {
+    allDone = warmupDone
+  } else {
+    const selfDone = exerciseDoneIn(state.sessions, dateStr, ex!, programWeek)
+    const partnerDone = shared ? exerciseDoneIn(partnerState!.sessions, dateStr, ex!, programWeek) : true
+    allDone = selfDone && partnerDone
+  }
 
-  const goPrev = () => { if (idx > 0) setCurrentId(exercises[idx - 1].id) }
-  const goNext = () => { if (idx < exercises.length - 1) setCurrentId(exercises[idx + 1].id) }
-  const isLast = idx >= exercises.length - 1
+  const goPrev = () => { if (idx > 0) setCurrentId(slides[idx - 1]) }
+  const goNext = () => { if (idx < slides.length - 1) setCurrentId(slides[idx + 1]) }
+  const isLast = idx >= slides.length - 1
 
   return (
     <div className="focus-overlay" role="dialog" aria-label="Focus workout mode" aria-modal="true">
       <TestModeBanner />
       <div className="focus-header">
         <button className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Exit focus mode">Overview</button>
-        <span className="muted" style={{ fontSize: 13 }}>{idx + 1} / {exercises.length}</span>
+        <span className="muted" style={{ fontSize: 13 }}>{idx + 1} / {slides.length}</span>
         <div className="focus-progress-bar" aria-hidden="true">
-          <div className="focus-progress-fill" style={{ width: `${((idx + 1) / exercises.length) * 100}%` }} />
+          <div className="focus-progress-fill" style={{ width: `${((idx + 1) / slides.length) * 100}%` }} />
         </div>
       </div>
 
       <div className="focus-body">
-        <ExerciseLogger
-          key={`focus-self-${dateStr}-${ex.id}`}
-          exercise={ex}
-          dateStr={dateStr}
-          programWeek={programWeek}
-          audioCtx={audioCtx}
-          onAudioCtxInit={onAudioCtxInit}
-          readOnly={readOnly}
-          muted={muted}
-          restDefaultSecs={restDefaultSecs}
-          sessionId={sessionId}
-          workoutType={workoutType}
-          focus
-          participantLabel={shared ? 'You' : undefined}
-        />
-        {shared && (
-          <ExerciseLogger
-            key={`focus-partner-${dateStr}-${ex.id}`}
-            exercise={ex}
-            dateStr={dateStr}
-            programWeek={programWeek}
+        {onWarmup ? (
+          <WarmupCard
+            warmup={warmup!}
+            done={warmupDone}
+            onDone={() => setWarmupDone(true)}
             audioCtx={audioCtx}
             onAudioCtxInit={onAudioCtxInit}
-            readOnly={readOnly}
             muted={muted}
-            restDefaultSecs={restDefaultSecs}
-            sessionId={sessionId}
-            workoutType={workoutType}
-            focus
-            participantLabel={partnerName!}
-            proxyFor={partnerName!}
-            dataState={partnerState!}
-            onLogged={refreshPartner}
           />
+        ) : (
+          <>
+            <ExerciseLogger
+              key={`focus-self-${dateStr}-${ex!.id}`}
+              exercise={ex!}
+              dateStr={dateStr}
+              programWeek={programWeek}
+              audioCtx={audioCtx}
+              onAudioCtxInit={onAudioCtxInit}
+              readOnly={readOnly}
+              muted={muted}
+              restDefaultSecs={restDefaultSecs}
+              sessionId={sessionId}
+              workoutType={workoutType}
+              focus
+              participantLabel={shared ? 'You' : undefined}
+            />
+            {shared && (
+              <ExerciseLogger
+                key={`focus-partner-${dateStr}-${ex!.id}`}
+                exercise={ex!}
+                dateStr={dateStr}
+                programWeek={programWeek}
+                audioCtx={audioCtx}
+                onAudioCtxInit={onAudioCtxInit}
+                readOnly={readOnly}
+                muted={muted}
+                restDefaultSecs={restDefaultSecs}
+                sessionId={sessionId}
+                workoutType={workoutType}
+                focus
+                participantLabel={partnerName!}
+                proxyFor={partnerName!}
+                dataState={partnerState!}
+                onLogged={refreshPartner}
+              />
+            )}
+          </>
         )}
       </div>
 
       <div className="focus-nav">
         <button className="btn btn-secondary" style={{ flex: 1 }} disabled={idx === 0}
-          onClick={goPrev} aria-label="Previous exercise">Prev</button>
+          onClick={goPrev} aria-label="Previous">Prev</button>
         {!isLast ? (
           <button
             className={`btn ${allDone ? 'btn-primary focus-next-ready' : 'btn-secondary'}`}
             style={{ flex: 2 }}
             onClick={goNext}
-            aria-label="Next exercise"
+            aria-label={onWarmup ? 'Start workout' : 'Next exercise'}
           >
-            {allDone ? 'Next exercise →' : 'Next'}
+            {allDone ? (onWarmup ? 'Start workout →' : 'Next exercise →') : 'Next'}
           </button>
         ) : (
           <button
@@ -1000,6 +1093,9 @@ export default function WorkoutView({ username, level }: { username: string; lev
     .map(id => exerciseMap.get(id))
     .filter((e): e is ExerciseDef => e !== undefined)
 
+  // The workout's cardio warm-up, shown as the first timed slide in focus mode.
+  const focusWarmup = isGym ? parseWarmup(getWorkout(workoutType as GymWorkout)?.warmup) : null
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
@@ -1059,6 +1155,7 @@ export default function WorkoutView({ username, level }: { username: string; lev
           partnerState={isShared ? partnerState : null}
           refreshPartner={refreshPartner}
           sendPresence={sendPresence}
+          warmup={focusWarmup}
         />
       )}
 
@@ -1211,7 +1308,7 @@ export default function WorkoutView({ username, level }: { username: string; lev
                     exercise={ex}
                     dateStr={dateStr}
                     programWeek={programWeek}
-                    onStartFocus={() => { setFocusIndex(i); sendPresence(ex.id) }}
+                    onStartFocus={() => { setFocusIndex(focusWarmup ? i + 1 : i); sendPresence(ex.id) }}
                     audioCtx={audioCtxRef.current}
                     onAudioCtxInit={initAudio}
                     partnerHere={[...partnerPresence.entries()].find(([, eid]) => eid === ex.id)?.[0]}
