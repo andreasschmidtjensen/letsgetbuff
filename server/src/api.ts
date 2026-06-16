@@ -17,7 +17,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { EMPTY_STATE, SCHEMA_VERSION } from '@letsgetbuff/shared'
 import type { AppState, Plan } from '@letsgetbuff/shared'
 import type { Db } from './db.js'
-import { proposeExercise, validateExerciseDef } from './claude.js'
+import { proposeExercise, validateExerciseDef, isAiConfigured, MISSING_KEY_MESSAGE } from './claude.js'
 
 // Shape attached by authGuard (Phase 3)
 interface JwtUser {
@@ -114,6 +114,13 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
     return reply.send({ plan, version: row.version })
   })
 
+  // ── GET /api/plan/ai-status ─────────────────────────────────────────────────
+  // Reports whether the server has an Anthropic key configured. No key value,
+  // no network call. Lets the UI distinguish "not configured" from "call failed".
+  app.get('/api/plan/ai-status', async (_req: FastifyRequest, reply: FastifyReply) => {
+    return reply.send({ configured: isAiConfigured() })
+  })
+
   // ── GET /api/plan/proposals ─────────────────────────────────────────────────
   app.get('/api/plan/proposals', async (req: FastifyRequest, reply: FastifyReply) => {
     const { status } = req.query as { status?: string }
@@ -131,6 +138,11 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       const { workoutId, request: userRequest } = req.body
       if (!workoutId || !userRequest?.trim()) {
         return reply.code(400).send({ error: 'workoutId and request are required' })
+      }
+      // Service-not-configured (503) is distinct from a failed Anthropic call (502)
+      // so the cause is unambiguous in logs and the UI.
+      if (!isAiConfigured()) {
+        return reply.code(503).send({ error: MISSING_KEY_MESSAGE, configured: false })
       }
       const planRow = db.prepare('SELECT json FROM plan WHERE id = 1').get() as { json: string } | undefined
       const plan = planRow ? (JSON.parse(planRow.json) as Plan) : null

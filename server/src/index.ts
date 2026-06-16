@@ -14,6 +14,8 @@ import { startBackupScheduler } from './backup.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 async function start() {
+  // Log AI key presence only (never the value) so deploys can confirm config.
+  console.log('[claude] API key present:', Boolean(config.anthropicApiKey))
   const db = openDb()
   const stopBackup = startBackupScheduler(config.buffDbPath)
   const wss = createWsServer(db)
@@ -53,7 +55,7 @@ async function start() {
     })
   })
 
-  app.get('/api/health', async () => ({ ok: true, version: 8 }))
+  app.get('/api/health', async () => ({ ok: true, version: 10 }))
 
   if (!config.isDev) {
     const staticDir = path.isAbsolute(config.staticDir)

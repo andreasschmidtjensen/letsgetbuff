@@ -339,3 +339,62 @@ test('approve re-validates candidate — rejects invalid stored data', () => {
   assert.equal(result.code, 422)
   assert.ok(result.error.includes('progressionType'))
 })
+
+// ---------------------------------------------------------------------------
+// Phase 10 — AI key configuration (503 vs 502 split, ai-status)
+// Mirrors server/src/claude.ts (isAiConfigured / MISSING_KEY_MESSAGE) and the
+// /api/plan/propose + /api/plan/ai-status routes in server/src/api.ts.
+// ---------------------------------------------------------------------------
+
+const MISSING_KEY_MESSAGE =
+  'Claude API key not configured on the server. Set ANTHROPIC_API_KEY in the server environment (the compose `.env`) and restart the container.'
+
+function isAiConfigured(apiKey) {
+  return Boolean(apiKey)
+}
+
+// /api/plan/ai-status — reports presence only, no key value, no network call
+function aiStatusRoute(apiKey) {
+  return { configured: isAiConfigured(apiKey) }
+}
+
+// /api/plan/propose — the missing-key gate (503) runs BEFORE any Claude call (502)
+function proposeRoute(db, apiKey, workoutId, request) {
+  if (!workoutId || !request?.trim()) {
+    return { code: 400, error: 'workoutId and request are required' }
+  }
+  if (!isAiConfigured(apiKey)) {
+    return { code: 503, error: MISSING_KEY_MESSAGE, configured: false }
+  }
+  // Configured path: a real Claude call would happen here; simulate success.
+  return proposeToDb(db, workoutId, request, { ...MOCK_EXERCISE })
+}
+
+test('ai-status reports unconfigured when no key', () => {
+  const result = aiStatusRoute('')
+  assert.equal(result.configured, false)
+})
+
+test('ai-status reports configured when key present', () => {
+  const result = aiStatusRoute('sk-ant-test')
+  assert.equal(result.configured, true)
+})
+
+test('propose with empty key returns 503 with actionable message', () => {
+  const db = makeDb()
+  const result = proposeRoute(db, '', 'A', 'add a shoulder accessory')
+  assert.equal(result.code, 503)
+  assert.equal(result.configured, false)
+  assert.ok(/ANTHROPIC_API_KEY/.test(result.error), 'message names the env var')
+  assert.ok(/restart/i.test(result.error), 'message tells the operator to restart')
+  // 503 gate must fire before anything is written to the DB
+  const count = db.prepare('SELECT COUNT(*) AS n FROM plan_proposals').get()
+  assert.equal(count.n, 0)
+})
+
+test('propose with a key configured proceeds past the 503 gate', () => {
+  const db = makeDb()
+  const result = proposeRoute(db, 'sk-ant-test', 'A', 'add a shoulder accessory')
+  assert.ok(result.proposal, 'a configured key reaches the propose logic')
+  assert.equal(result.proposal.status, 'pending')
+})

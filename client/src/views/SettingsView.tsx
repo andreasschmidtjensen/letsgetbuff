@@ -149,11 +149,19 @@ function ExerciseProposalCard({
 
 // ── ProposeExerciseForm ────────────────────────────────────────────────────────
 
-function ProposeExerciseForm({ onProposed }: { onProposed: (p: Proposal) => void }) {
+function ProposeExerciseForm({
+  onProposed,
+  aiConfigured,
+}: {
+  onProposed: (p: Proposal) => void
+  aiConfigured: boolean | null
+}) {
   const [workoutId, setWorkoutId] = useState<'A' | 'B'>('A')
   const [request, setRequest] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const disabled = aiConfigured === false
 
   const submit = async () => {
     if (!request.trim()) return
@@ -179,6 +187,15 @@ function ProposeExerciseForm({ onProposed }: { onProposed: (p: Proposal) => void
     }
   }
 
+  if (disabled) {
+    return (
+      <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>
+        Claude API key not configured on the server. Add <code>ANTHROPIC_API_KEY</code> to the
+        server <code>.env</code> and restart the container to enable this feature.
+      </p>
+    )
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
@@ -189,6 +206,7 @@ function ProposeExerciseForm({ onProposed }: { onProposed: (p: Proposal) => void
             className={`btn btn-sm ${workoutId === w ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setWorkoutId(w)}
             aria-pressed={workoutId === w}
+            disabled={aiConfigured === null}
           >
             {w}
           </button>
@@ -201,10 +219,11 @@ function ProposeExerciseForm({ onProposed }: { onProposed: (p: Proposal) => void
         value={request}
         onChange={e => setRequest(e.target.value)}
         maxLength={500}
+        disabled={aiConfigured === null}
       />
       <button
         className="btn btn-primary btn-sm"
-        disabled={busy || !request.trim()}
+        disabled={busy || !request.trim() || aiConfigured === null}
         onClick={submit}
       >
         {busy ? '🤖 Asking Claude…' : '🤖 Propose exercise'}
@@ -236,12 +255,18 @@ export default function SettingsView({ onLogout }: Props = {}) {
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [proposalBusy, setProposalBusy] = useState(false)
   const [proposalMsg, setProposalMsg] = useState<string | null>(null)
+  // Phase 10: null = unknown (still checking), true/false = server AI key status
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
 
   useEffect(() => {
     fetch('/api/plan/proposals?status=pending')
       .then(r => r.json())
       .then((d: { proposals: Proposal[] }) => setProposals(d.proposals))
       .catch(() => { /* not critical */ })
+    fetch('/api/plan/ai-status')
+      .then(r => r.json())
+      .then((d: { configured: boolean }) => setAiConfigured(Boolean(d.configured)))
+      .catch(() => setAiConfigured(false))
   }, [])
 
   const handleApprove = async (id: number) => {
@@ -389,7 +414,10 @@ export default function SettingsView({ onLogout }: Props = {}) {
           Describe what you need and Claude will propose a schema-valid exercise following the
           programme guidelines. Review it before it's added to the shared plan.
         </p>
-        <ProposeExerciseForm onProposed={p => setProposals(prev => [p, ...prev])} />
+        <ProposeExerciseForm
+          onProposed={p => setProposals(prev => [p, ...prev])}
+          aiConfigured={aiConfigured}
+        />
       </div>
 
       {/* Pending proposals */}

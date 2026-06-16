@@ -159,6 +159,23 @@ const EXERCISE_TOOL: Anthropic.Tool = {
 }
 
 // ---------------------------------------------------------------------------
+// Configuration status
+// ---------------------------------------------------------------------------
+
+/** Actionable message shown when the Anthropic key is missing from the server env. */
+export const MISSING_KEY_MESSAGE =
+  'Claude API key not configured on the server. Set ANTHROPIC_API_KEY in the server environment (the compose `.env`) and restart the container.'
+
+/**
+ * Whether the server has an Anthropic API key. Does NOT make a network call and
+ * never exposes the key value — just reports presence so the UI can tell
+ * "not configured" (503) apart from "the Claude call failed" (502).
+ */
+export function isAiConfigured(): boolean {
+  return Boolean(config.anthropicApiKey)
+}
+
+// ---------------------------------------------------------------------------
 // Validation helpers
 // ---------------------------------------------------------------------------
 
@@ -235,7 +252,8 @@ export async function proposeExercise(
   existingExerciseIds: string[],
 ): Promise<ExerciseDef> {
   if (!config.anthropicApiKey) {
-    throw new Error('ANTHROPIC_API_KEY is not set — cannot call Claude API')
+    // Defensive — callers should gate on isAiConfigured() and return 503 first.
+    throw new Error(MISSING_KEY_MESSAGE)
   }
 
   const client = new Anthropic({ apiKey: config.anthropicApiKey })
