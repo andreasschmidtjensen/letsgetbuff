@@ -9,6 +9,7 @@ import {
   fetchServerState, putServerState,
   isMigrated, markMigrated,
 } from './persistence'
+import { useTestMode } from './testMode'
 
 // Fetch the shared plan from the server and inject it into the catalog module.
 // Falls back silently — the catalog's DEFAULT_PLAN remains active if this fails.
@@ -52,6 +53,12 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
   const [state, dispatch] = useReducer(reducer, undefined, () => loadLocalState() ?? { ...EMPTY_STATE })
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading')
   const [pendingCount, setPendingCount] = useState(0)
+
+  // Test mode: when on, suppress ALL persistence (server + local cache). Kept in a
+  // ref so the async write paths read the current value without re-subscribing.
+  const { testMode } = useTestMode()
+  const testModeRef = useRef(testMode)
+  testModeRef.current = testMode
 
   // Always-current references used inside async callbacks
   const latest = useRef(state)
@@ -119,6 +126,8 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
   useEffect(() => {
     // Don't write-back during initial load
     if (syncStatus === 'loading') return
+    // Test mode: in-memory only — never touch the server or the local cache.
+    if (testModeRef.current) return
 
     dirtyAfterLoad.current = true
     setPendingCount(1)
@@ -151,6 +160,7 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
   useEffect(() => {
     async function retry() {
       if (pendingCount === 0) return
+      if (testModeRef.current) return  // never push sandbox edits
       setSyncStatus('syncing')
       try {
         await putServerState(latest.current)
@@ -171,13 +181,30 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
 
   // ── 4. Flush on tab close ─────────────────────────────────────────────────
   useEffect(() => {
-    const flush = () => saveLocalState(latest.current)
+    const flush = () => { if (!testModeRef.current) saveLocalState(latest.current) }
     window.addEventListener('beforeunload', flush)
     return () => {
       window.removeEventListener('beforeunload', flush)
       flush()
     }
   }, [])
+
+  // ── 5. Leaving test mode → discard sandbox edits, restore real data ───────
+  const prevTestMode = useRef(testMode)
+  useEffect(() => {
+    if (prevTestMode.current && !testMode) {
+      // The local cache was frozen during test mode, so it still holds real data.
+      const cached = loadLocalState()
+      if (cached) {
+        dispatch({ type: 'REPLACE_STATE', state: cached })
+      } else {
+        fetchServerState()
+          .then(({ state: real }) => dispatch({ type: 'REPLACE_STATE', state: real }))
+          .catch(() => { /* offline — keep what we have */ })
+      }
+    }
+    prevTestMode.current = testMode
+  }, [testMode])
 
   const stableDispatch = useCallback(dispatch, [dispatch])
 

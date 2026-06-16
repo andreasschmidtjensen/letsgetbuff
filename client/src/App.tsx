@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { StoreProvider } from './store/store'
+import { TestModeProvider } from './store/testMode'
 import { Tab, Privilege } from '@letsgetbuff/shared'
 import HomeView from './views/HomeView'
 import WorkoutView from './views/WorkoutView'
@@ -8,6 +9,7 @@ import MilestonesView from './views/MilestonesView'
 import SettingsView from './views/SettingsView'
 import LoginView from './views/LoginView'
 import HistoryView from './views/HistoryView'
+import TestModeBanner from './components/TestModeBanner'
 import './app.css'
 
 const TABS: { id: Tab; label: string }[] = [
@@ -62,6 +64,7 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
 
   return (
     <div className="app">
+      <TestModeBanner />
       <header className="app-header">
         <span className="app-title">Let's Get Buff</span>
         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
@@ -110,8 +113,10 @@ export default function App() {
   }
 
   return (
-    <StoreProvider username={username!}>
-      <AppInner username={username!} level={level} onLogout={onLogout} />
-    </StoreProvider>
+    <TestModeProvider>
+      <StoreProvider username={username!}>
+        <AppInner username={username!} level={level} onLogout={onLogout} />
+      </StoreProvider>
+    </TestModeProvider>
   )
 }

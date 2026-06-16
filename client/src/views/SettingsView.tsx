@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 import { useStore, SyncStatus } from '../store/store'
+import { useTestMode } from '../store/testMode'
 
 // ── Theme helpers (exported for use in main.tsx) ──────────────────────────────
 const THEME_KEY = 'letsgetbuff-theme'
@@ -480,6 +481,28 @@ function RestTimerCard() {
   )
 }
 
+// ── Test mode toggle (all users, frontend-only) ────────────────────────────────
+
+function TestModeCard() {
+  const { testMode, setTestMode } = useTestMode()
+  return (
+    <div className="card mb-12" style={testMode ? { borderColor: 'var(--accent)' } : undefined}>
+      <div className="card-title">🧪 Test mode</div>
+      <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
+        Try workouts, sets and timers freely — nothing is saved to your log or the server.
+        Turn it off to return to your real data. This setting is only on this device.
+      </p>
+      <button
+        className={`btn btn-sm ${testMode ? 'btn-primary' : 'btn-secondary'}`}
+        onClick={() => setTestMode(!testMode)}
+        aria-pressed={testMode}
+      >
+        {testMode ? 'Test mode: On' : 'Test mode: Off'}
+      </button>
+    </div>
+  )
+}
+
 // ── Main SettingsView ──────────────────────────────────────────────────────────
 
 export default function SettingsView({ onLogout, level }: Props = {}) {
@@ -592,6 +615,9 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
         Settings
         <SyncBadge status={syncStatus} pending={pendingCount} />
       </h2>
+
+      {/* Test mode (frontend-only sandbox) */}
+      <TestModeCard />
 
       {/* Start date */}
       <div className="card mb-12">

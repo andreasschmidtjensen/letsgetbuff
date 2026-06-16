@@ -19,8 +19,10 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useStore } from '../store/store'
+import { useTestMode } from '../store/testMode'
 import { useLiveOrder } from '../store/useLiveOrder'
 import StartSessionModal from '../components/StartSessionModal'
+import TestModeBanner from '../components/TestModeBanner'
 import { computeProgramWeek, scheduleFor, todayDayName } from '@letsgetbuff/shared'
 import { todayKey, keyToDate } from '../lib/date'
 import { getWorkoutExercises, getWorkout, ExerciseDef } from '@letsgetbuff/shared'
@@ -416,6 +418,7 @@ function SortableExerciseLogger(props: ExerciseLoggerProps) {
 
 function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx, onAudioCtxInit, dragHandleListeners, dragHandleAttributes, partnerHere, readOnly, muted, restDefaultSecs, proxyFor, sessionId, workoutType, dataState, participantLabel, onLogged, focus }: ExerciseLoggerProps) {
   const { state, dispatch } = useStore()
+  const { testMode } = useTestMode()
   // In proxy mode the partner's sessions blob is the data source; otherwise own store.
   const read = dataState ?? state
   const existing = read.sessions[dateStr]?.entries[exercise.id]
@@ -449,6 +452,9 @@ function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, audioCtx
 
   const saveEntry = (newSets: SetEntry[], fe: boolean) => {
     if (proxyFor && sessionId != null && workoutType) {
+      // Test mode: don't write to the partner's real log (own edits stay in-memory
+      // via the reducer; the store suppresses their persistence).
+      if (testMode) return
       // Proxy mode: write to the partner's state server-side only.
       fetch('/api/proxy-log', {
         method: 'PUT',
@@ -723,6 +729,7 @@ function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAu
 
   return (
     <div className="focus-overlay" role="dialog" aria-label="Focus workout mode" aria-modal="true">
+      <TestModeBanner />
       <div className="focus-header">
         <button className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Exit focus mode">Overview</button>
         <span className="muted" style={{ fontSize: 13 }}>{idx + 1} / {exercises.length}</span>
