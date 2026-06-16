@@ -1,0 +1,33 @@
+services:
+  letsgetbuff:
+    # build: .  # kept for optional local builds; the server pulls the prebuilt image below
+    image: ghcr.io/andreasschmidtjensen/letsgetbuff:latest
+    container_name: letsgetbuff
+    restart: unless-stopped
+    ports:
+      - "8585:8585"           # change left side to use a different host port
+    environment:
+      NODE_ENV: production
+      PORT: 8585
+      BUFF_DB_PATH: /data/buff.db
+      STATIC_DIR: /app/client/dist
+      SESSION_SECRET: "${SESSION_SECRET:?SESSION_SECRET env var is required}"
+      # Path inside the container — matches the bind mount above.
+      CWA_DB_PATH: /cwa-config/app.db
+    volumes:
+      # Named volume for buff.db — persists across container restarts.
+      - buff-data:/data
+
+      # Read-only bind mount for Calibre-Web Automated's app.db.
+      # Mounts the whole config dir (same pattern as CWA-web-tools).
+      - /opt/calibre-web-automated/config:/cwa-config:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8585/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  buff-data:
+    driver: local

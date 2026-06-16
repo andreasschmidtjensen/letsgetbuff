@@ -1,0 +1,4 @@
+import { it, expect } from 'vitest'
+it('tz at startup', () => {
+  expect(new Date(Date.UTC(2026,5,15,3,30)).getTimezoneOffset()).toBe(240)
+})
