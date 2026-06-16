@@ -17,12 +17,7 @@ import assert from 'node:assert/strict'
 import { DatabaseSync } from 'node:sqlite'
 import http from 'node:http'
 import { createHmac } from 'node:crypto'
-import { createRequire } from 'node:module'
-import { resolve } from 'node:path'
-
-const SERVER_ROOT = '/sessions/clever-blissful-maxwell/mnt/GYMN app/letsgetbuff-main/letsgetbuff-main/server'
-const req2 = createRequire(resolve(SERVER_ROOT, 'package.json'))
-const { WebSocketServer, WebSocket } = req2(resolve(SERVER_ROOT, 'node_modules/node_modules/ws'))
+import { WebSocketServer, WebSocket } from 'ws'
 
 const SECRET = 'test-ws-secret'
 const PLAN_ORDER = ['squat', 'press', 'row', 'deadlift']

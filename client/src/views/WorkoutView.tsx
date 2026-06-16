@@ -533,7 +533,10 @@ export default function WorkoutView({ username }: { username: string }) {
 
   const initAudio = useCallback(() => {
     if (!audioCtxRef.current) {
-      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const Ctor =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      audioCtxRef.current = new Ctor!()
     }
     return audioCtxRef.current
   }, [])

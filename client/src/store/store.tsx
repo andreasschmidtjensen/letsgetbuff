@@ -113,7 +113,6 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
     // Load server plan in parallel — no need to block state restore on this
     loadServerPlan()
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username])
 
   // ── 2. Write-through: debounced PUT on every state change ─────────────────
@@ -168,7 +167,6 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
       window.removeEventListener('online', retry)
       clearInterval(interval)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingCount])
 
   // ── 4. Flush on tab close ─────────────────────────────────────────────────
