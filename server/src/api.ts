@@ -22,7 +22,7 @@
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { EMPTY_STATE, SCHEMA_VERSION } from '@letsgetbuff/shared'
-import type { AppState, Plan, Session, ExerciseEntry } from '@letsgetbuff/shared'
+import type { AppState, Plan, Session, ExerciseEntry, ExerciseDef } from '@letsgetbuff/shared'
 import type { Db } from './db.js'
 import { proposeExercise, validateExerciseDef, isAiConfigured, getApiKey, MISSING_KEY_MESSAGE } from './claude.js'
 import { requirePrivilege, type Privilege } from './auth.js'
@@ -149,7 +149,13 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
     const rows = status
       ? (db.prepare('SELECT * FROM plan_proposals WHERE status = ? ORDER BY proposed_at DESC').all(status) as unknown as PlanProposalRow[])
       : (db.prepare('SELECT * FROM plan_proposals ORDER BY proposed_at DESC').all() as unknown as PlanProposalRow[])
-    const proposals = rows.map(r => ({ ...r, exercise: JSON.parse(r.json) }))
+    const proposals = rows.map(r => {
+      const stored = JSON.parse(r.json)
+      // Support both old format (plain ExerciseDef) and new format ({ exercise, warnings })
+      const exercise: ExerciseDef = stored.exercise ?? stored
+      const warnings: string[] = stored.warnings ?? []
+      return { ...r, exercise, warnings }
+    })
     return reply.send({ proposals })
   })
 
@@ -169,9 +175,10 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       const planRow = db.prepare('SELECT json FROM plan WHERE id = 1').get() as { json: string } | undefined
       const plan = planRow ? (JSON.parse(planRow.json) as Plan) : null
       const existingIds = plan ? plan.workouts.flatMap(w => w.exercises.map(e => e.id)) : []
-      let exercise
+      let exercise: ExerciseDef
+      let warnings: string[]
       try {
-        exercise = await proposeExercise(db, workoutId, userRequest.trim(), existingIds)
+        ;({ exercise, warnings } = await proposeExercise(db, workoutId, userRequest.trim(), existingIds))
       } catch (err) {
         app.log.error({ err }, '[api] Claude proposal failed')
         return reply.code(502).send({ error: String(err) })
@@ -179,20 +186,21 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       if (existingIds.includes(exercise.id)) {
         return reply.code(409).send({ error: `Exercise id "${exercise.id}" already exists in the plan` })
       }
+      const storedJson = JSON.stringify({ exercise, warnings })
       const result = db.prepare(`
         INSERT INTO plan_proposals (workout_id, request, json, status)
         VALUES (?, ?, ?, 'pending')
-      `).run(workoutId, userRequest.trim(), JSON.stringify(exercise))
+      `).run(workoutId, userRequest.trim(), storedJson)
       const proposal: PlanProposalRow = {
         id: Number(result.lastInsertRowid),
         workout_id: workoutId,
         request: userRequest.trim(),
-        json: JSON.stringify(exercise),
+        json: storedJson,
         status: 'pending',
         proposed_at: new Date().toISOString(),
         reviewed_at: null,
       }
-      return reply.code(201).send({ proposal: { ...proposal, exercise } })
+      return reply.code(201).send({ proposal: { ...proposal, exercise, warnings } })
     },
   )
 
@@ -206,9 +214,12 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       if (row.status !== 'pending') {
         return reply.code(409).send({ error: `Proposal is already ${row.status}` })
       }
-      let exercise
+      let exercise: ExerciseDef
       try {
-        exercise = validateExerciseDef(JSON.parse(row.json))
+        const stored = JSON.parse(row.json)
+        // Handle both old format (plain ExerciseDef) and new format ({ exercise, warnings })
+        const rawExercise = stored.exercise ?? stored
+        ;({ exercise } = validateExerciseDef(rawExercise))
       } catch (err) {
         return reply.code(422).send({ error: `Validation failed: ${err}` })
       }

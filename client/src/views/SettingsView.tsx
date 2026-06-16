@@ -59,6 +59,7 @@ interface Proposal {
   workoutId: 'A' | 'B'
   request: string
   exercise: ExerciseDef
+  warnings?: string[]
   status: 'pending' | 'approved' | 'rejected'
   proposedAt: string
   reviewedAt: string | null
@@ -104,9 +105,27 @@ function ExerciseProposalCard({
 
       <p style={{ fontSize: 13, marginTop: 8, marginBottom: 6 }}>{ex.notes}</p>
 
+      {(proposal.warnings?.length ?? 0) > 0 && (
+        <div style={{
+          marginBottom: 8,
+          padding: '6px 10px',
+          background: 'var(--accent-dim)',
+          borderLeft: '3px solid var(--accent)',
+          borderRadius: 4,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>⚠ Potentially problematic</div>
+          {proposal.warnings!.map((w, i) => (
+            <div key={i} style={{ fontSize: 12 }}>{w}</div>
+          ))}
+        </div>
+      )}
+
       {ex.safetyCues.length > 0 && (
         <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
-          ⚠ Safety: {ex.safetyCues.join(', ')}
+          ⚠ {ex.safetyCues.map(c =>
+            c === 'knee' ? 'rough on the knees — monitor for discomfort' :
+            c === 'back' ? 'loads the lower back — use strict form' : c
+          ).join(' · ')}
         </div>
       )}
 

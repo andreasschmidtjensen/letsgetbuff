@@ -43,8 +43,8 @@ Timed exercises:
   band1: 3 × 30 s, band2: 3 × 45 s, band3: 3 × 60 s
   Set reps to null and provide seconds instead.
 
-## Safety rules (HARD constraints):
-- NO loaded spinal flexion (no crunches, sit-ups, good mornings with heavy load, Jefferson curls).
+## Safety rules:
+- Loaded spinal flexion (crunches, sit-ups, good mornings under load, Jefferson curls) is high-risk for beginners. Prefer alternatives; only propose these if explicitly requested, and always add a "back" safetyCue with a clear safety warning in notes.
 - Tag "knee" safetyCue for any exercise with knee-loading (lunges, squats, leg press variants, step-ups).
 - Tag "back" safetyCue for any hip-hinge or overhead load (RDL, rows, shoulder press).
 - Exercises with safetyCues must include a brief safety note in the "notes" field.
@@ -202,7 +202,17 @@ function isValidSafetyCue(s: string): s is 'knee' | 'back' {
   return s === 'knee' || s === 'back'
 }
 
-export function validateExerciseDef(raw: unknown): ExerciseDef {
+// Movements that warrant a warning (not a hard block). Each entry maps a name
+// substring to a plain-English description of the risk.
+const SAFETY_FLAGS: Array<{ match: string; message: string }> = [
+  { match: 'crunch',        message: 'loaded spinal flexion — compressive stress on the lumbar discs' },
+  { match: 'sit-up',        message: 'loaded spinal flexion — compressive stress on the lumbar discs' },
+  { match: 'situp',         message: 'loaded spinal flexion — compressive stress on the lumbar discs' },
+  { match: 'jefferson',     message: 'asymmetric spinal rotation under load — high lower-back injury risk' },
+  { match: 'good morning',  message: 'heavy load in a long-lever hip-hinge — high lower-back demand, requires excellent form' },
+]
+
+export function validateExerciseDef(raw: unknown): { exercise: ExerciseDef; warnings: string[] } {
   if (typeof raw !== 'object' || raw === null) throw new Error('Not an object')
   const r = raw as Record<string, unknown>
 
@@ -225,14 +235,14 @@ export function validateExerciseDef(raw: unknown): ExerciseDef {
   const rp = r.repProgression as Record<string, unknown>
   if (!rp.band1 || !rp.band2 || !rp.band3) throw new Error('repProgression must have band1/band2/band3')
 
-  // Safety rule: no loaded spinal flexion signals
-  const forbidden = ['crunch', 'sit-up', 'situp', 'jefferson', 'good morning']
+  // Collect warnings for high-risk movement patterns (flag, don't block).
+  const warnings: string[] = []
   const lower = (r.name as string).toLowerCase()
-  for (const f of forbidden) {
-    if (lower.includes(f)) throw new Error(`Safety violation: "${r.name}" resembles a forbidden movement (${f})`)
+  for (const { match, message } of SAFETY_FLAGS) {
+    if (lower.includes(match)) warnings.push(message)
   }
 
-  return {
+  const exercise: ExerciseDef = {
     id: r.id as string,
     name: r.name as string,
     sets: typeof r.sets === 'number' ? r.sets : 3,
@@ -248,6 +258,8 @@ export function validateExerciseDef(raw: unknown): ExerciseDef {
     ...(r.minWeek != null ? { minWeek: r.minWeek as number } : {}),
     repProgression: rp as ExerciseDef['repProgression'],
   }
+
+  return { exercise, warnings }
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +278,7 @@ export async function proposeExercise(
   workoutId: 'A' | 'B',
   request: string,
   existingExerciseIds: string[],
-): Promise<ExerciseDef> {
+): Promise<{ exercise: ExerciseDef; warnings: string[] }> {
   const apiKey = getApiKey(db)
   if (!apiKey) {
     // Defensive — callers should gate on isAiConfigured(db) and return 503 first.
