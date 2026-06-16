@@ -568,10 +568,15 @@ export default function WorkoutView({ username, level }: { username: string; lev
   })
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null)
 
-  // Sync restDefaultSecs when the localStorage value changes (e.g., from Settings tab)
+  // Sync restDefaultSecs when another tab/component updates localStorage
   useEffect(() => {
-    const saved = localStorage.getItem(REST_SECS_KEY)
-    setRestDefaultSecs(saved ? Number(saved) : REST_SECS_DEFAULT)
+    const handler = (e: StorageEvent) => {
+      if (e.key === REST_SECS_KEY) {
+        setRestDefaultSecs(e.newValue ? Number(e.newValue) : REST_SECS_DEFAULT)
+      }
+    }
+    window.addEventListener('storage', handler)
+    return () => window.removeEventListener('storage', handler)
   }, [])
 
   const toggleMute = useCallback(() => {

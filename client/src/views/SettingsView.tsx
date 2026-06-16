@@ -3,6 +3,14 @@ import { useStore, SyncStatus } from '../store/store'
 
 // ── Theme helpers (exported for use in main.tsx) ──────────────────────────────
 const THEME_KEY = 'letsgetbuff-theme'
+const REST_SECS_KEY = 'letsgetbuff-rest-secs'
+const REST_SECS_DEFAULT = 90
+const REST_SECS_OPTIONS = [
+  { value: 60,  label: '1 min' },
+  { value: 90,  label: '90 sec' },
+  { value: 120, label: '2 min' },
+  { value: 180, label: '3 min' },
+]
 
 export function applyTheme(theme: 'dark' | 'light') {
   document.documentElement.setAttribute('data-theme', theme)
@@ -319,6 +327,41 @@ function AdminUsersCard() {
   )
 }
 
+// ── Rest timer preference card ────────────────────────────────────────────────
+
+function RestTimerCard() {
+  const [secs, setSecs] = useState(() => {
+    const saved = localStorage.getItem(REST_SECS_KEY)
+    return saved ? Number(saved) : REST_SECS_DEFAULT
+  })
+
+  const change = (val: number) => {
+    setSecs(val)
+    localStorage.setItem(REST_SECS_KEY, String(val))
+  }
+
+  return (
+    <div className="card mb-12">
+      <div className="card-title">Rest timer default</div>
+      <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
+        Duration shown after each completed set (except the last). You can still adjust ±15s on the fly during a workout.
+      </p>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="Rest timer duration">
+        {REST_SECS_OPTIONS.map(opt => (
+          <button
+            key={opt.value}
+            className={`btn btn-sm ${secs === opt.value ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => change(opt.value)}
+            aria-pressed={secs === opt.value}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Main SettingsView ──────────────────────────────────────────────────────────
 
 export default function SettingsView({ onLogout, level }: Props = {}) {
@@ -490,6 +533,9 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
           <p style={{ color: 'var(--green)', fontSize: 13, marginTop: 8 }}>Data imported and synced to server.</p>
         )}
       </div>
+
+      {/* Rest timer */}
+      <RestTimerCard />
 
       {/* Phase 8: Exercise discovery */}
       <div className="card mb-12">
