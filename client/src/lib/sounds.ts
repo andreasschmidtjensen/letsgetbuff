@@ -1,18 +1,33 @@
 /**
- * Web Audio sound effects — all synthesized, no audio files.
+ * Timer sound effects.
  *
- * The timer-end alarm is user-selectable (Settings): a clean "beep" pair, or a
- * distorted heavy-metal power-chord strum. Stored per browser in localStorage.
+ * Two flavours of each effect are offered in Settings:
+ *   • synthesized  — generated live with the Web Audio API, zero network/assets.
+ *   • real         — actual recordings shipped in /public/sounds (mp3).
+ *
+ * Real recordings are openly-licensed clips (Wikimedia Commons / SoundBible),
+ * normalized to mp3 for universal browser support (incl. iOS Safari, which
+ * does not play ogg/opus). If a recording fails to load, playback falls back
+ * to the matching synthesized version.
+ *
+ * The choice is stored per browser in localStorage.
  */
 
-export type TimerSound = 'beep' | 'metal' | 'chirp' | 'moan' | 'shout'
+export type TimerSound =
+  | 'beep'
+  | 'metal' | 'chirp' | 'moan' | 'shout'              // synthesized
+  | 'metal-real' | 'chirp-real' | 'moan-real' | 'shout-real'  // recordings
 
 export const TIMER_SOUNDS: { value: TimerSound; label: string }[] = [
-  { value: 'beep',  label: 'Beep' },
-  { value: 'metal', label: '🤘 Metal chord' },
-  { value: 'chirp', label: '🐦 Bird chirp' },
-  { value: 'moan',  label: '😳 Moan' },
-  { value: 'shout', label: '🤬 Shout' },
+  { value: 'beep',        label: 'Beep' },
+  { value: 'metal',       label: '🤘 Metal chord (synth)' },
+  { value: 'metal-real',  label: '🤘 Metal guitar (real)' },
+  { value: 'chirp',       label: '🐦 Bird chirp (synth)' },
+  { value: 'chirp-real',  label: '🐦 Bird chirp (real)' },
+  { value: 'moan',        label: '😳 Moan (synth)' },
+  { value: 'moan-real',   label: '😳 Moan (real)' },
+  { value: 'shout',       label: '🤬 Shout (synth)' },
+  { value: 'shout-real',  label: '🤬 Shout (real)' },
 ]
 
 const TIMER_SOUND_KEY = 'letsgetbuff-timer-sound'
@@ -25,6 +40,55 @@ export function getTimerSound(): TimerSound {
 export function setTimerSound(s: TimerSound): void {
   localStorage.setItem(TIMER_SOUND_KEY, s)
 }
+
+// ── Real recordings ──────────────────────────────────────────────────────────
+
+const SOUND_FILES: Record<string, string> = {
+  'metal-real': 'metal.mp3',
+  'chirp-real': 'chirp.mp3',
+  'moan-real':  'moan.mp3',
+  'shout-real': 'shout.mp3',
+}
+
+const audioCache: Record<string, HTMLAudioElement> = {}
+
+function fileUrl(name: string): string {
+  const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/'
+  return `${base}sounds/${name}`.replace(/([^:])\/\/+/g, '$1/')
+}
+
+/** Play a bundled recording; run `fallback()` if it can't load/play. */
+function playFile(name: string, fallback: () => void): void {
+  if (typeof Audio === 'undefined') { fallback(); return }
+  try {
+    let a = audioCache[name]
+    if (!a) {
+      a = new Audio(fileUrl(name))
+      a.preload = 'auto'
+      audioCache[name] = a
+    }
+    a.currentTime = 0
+    a.volume = 1
+    const p = a.play()
+    if (p && typeof p.catch === 'function') p.catch(() => fallback())
+  } catch {
+    fallback()
+  }
+}
+
+/** Warm the audio cache so the first alarm is instant (call after a user gesture). */
+export function preloadTimerSounds(): void {
+  if (typeof Audio === 'undefined') return
+  for (const name of Object.values(SOUND_FILES)) {
+    if (!audioCache[name]) {
+      const a = new Audio(fileUrl(name))
+      a.preload = 'auto'
+      audioCache[name] = a
+    }
+  }
+}
+
+// ── Synthesized effects ──────────────────────────────────────────────────────
 
 /** Short sine tone. */
 export function beep(ctx: AudioContext, freq = 880, duration = 0.12, vol = 0.4): void {
@@ -170,13 +234,21 @@ export function playShout(): void {
   window.speechSynthesis.speak(u)
 }
 
+// ── Dispatcher ───────────────────────────────────────────────────────────────
+
 /** Alarm played when a rest / exercise timer runs out — honours the user's choice. */
 export function playTimerEnd(ctx: AudioContext, sound: TimerSound = getTimerSound()): void {
   switch (sound) {
+    // Synthesized
     case 'metal': playMetalChord(ctx); return
     case 'chirp': playBirdChirp(ctx); return
     case 'moan':  playMoan(ctx); return
     case 'shout': playShout(); return
+    // Real recordings (fall back to the matching synth if the file won't play)
+    case 'metal-real': playFile('metal.mp3', () => playMetalChord(ctx)); return
+    case 'chirp-real': playFile('chirp.mp3', () => playBirdChirp(ctx)); return
+    case 'moan-real':  playFile('moan.mp3',  () => playMoan(ctx)); return
+    case 'shout-real': playFile('shout.mp3', () => playShout()); return
     default:
       beep(ctx, 660, 0.08, 0.3)
       setTimeout(() => beep(ctx, 880, 0.15, 0.35), 100)

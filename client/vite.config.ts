@@ -13,7 +13,7 @@ export default defineConfig(() => {
         injectRegister: "auto",
         workbox: {
           // Cache the app shell and static assets
-          globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+          globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,mp3}"],
           // Network-first for API calls so data is always fresh when online
           runtimeCaching: [
             {
