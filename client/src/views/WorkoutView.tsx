@@ -21,7 +21,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useStore } from '../store/store'
 import { useTestMode } from '../store/testMode'
 import { useLiveOrder } from '../store/useLiveOrder'
-import { playDoneSound, playTimerEnd } from '../lib/sounds'
+import { playDoneSound, playTimerEnd, preloadTimerSounds } from '../lib/sounds'
 import StartSessionModal from '../components/StartSessionModal'
 import TestModeBanner from '../components/TestModeBanner'
 import { computeProgramWeek, scheduleFor, todayDayName } from '@letsgetbuff/shared'
@@ -924,6 +924,9 @@ export default function WorkoutView({ username, level }: { username: string; lev
         window.AudioContext ||
         (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
       audioCtxRef.current = new Ctor!()
+      // First audio gesture of the session — warm the recordings so the first
+      // timer alarm plays instantly.
+      preloadTimerSounds()
     }
     return audioCtxRef.current
   }, [])

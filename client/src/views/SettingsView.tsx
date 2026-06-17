@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { useStore, SyncStatus } from '../store/store'
 import { useTestMode } from '../store/testMode'
-import { TIMER_SOUNDS, getTimerSound, setTimerSound, playTimerEnd, type TimerSound } from '../lib/sounds'
+import { TIMER_SOUNDS, getTimerSound, setTimerSound, playTimerEnd, preloadTimerSounds, type TimerSound } from '../lib/sounds'
 
 // ── Theme helpers (exported for use in main.tsx) ──────────────────────────────
 const THEME_KEY = 'letsgetbuff-theme'
@@ -486,6 +486,9 @@ function RestTimerCard() {
 
 function TimerSoundCard() {
   const [sound, setSound] = useState<TimerSound>(() => getTimerSound())
+
+  // Warm the recordings so previews play without a load hiccup.
+  useEffect(() => { preloadTimerSounds() }, [])
 
   const preview = (s: TimerSound) => {
     if (s === 'shout') { playTimerEnd(null as unknown as AudioContext, s); return }  // uses speech synthesis
