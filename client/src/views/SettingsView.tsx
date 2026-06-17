@@ -3,8 +3,6 @@ import { useStore, SyncStatus } from '../store/store'
 import { useTestMode } from '../store/testMode'
 import { TIMER_SOUNDS, getTimerSound, setTimerSound, playTimerEnd, preloadTimerSounds, type TimerSound } from '../lib/sounds'
 
-// ── Theme helpers (exported for use in main.tsx) ──────────────────────────────
-const THEME_KEY = 'letsgetbuff-theme'
 const REST_SECS_KEY = 'letsgetbuff-rest-secs'
 const REST_SECS_DEFAULT = 90
 const REST_SECS_OPTIONS = [
@@ -14,16 +12,8 @@ const REST_SECS_OPTIONS = [
   { value: 180, label: '3 min' },
 ]
 
-export function applyTheme(theme: 'dark' | 'light') {
-  document.documentElement.setAttribute('data-theme', theme)
-}
-
-export function initTheme() {
-  const saved = localStorage.getItem(THEME_KEY) as 'dark' | 'light' | null
-  applyTheme(saved ?? 'dark')
-}
-
 import { exportData, validateImport, putServerState } from '../store/persistence'
+import { useEinkMode } from '../store/einkMode'
 import { todayKey } from '../lib/date'
 import { SCHEMA_VERSION } from '@letsgetbuff/shared'
 import type { ExerciseDef, Privilege } from '@letsgetbuff/shared'
@@ -527,6 +517,27 @@ function TimerSoundCard() {
   )
 }
 
+// ── E-ink mode toggle (per device, frontend-only) ──────────────────────────────
+
+function EinkModeCard() {
+  const { einkMode, setEinkMode } = useEinkMode()
+  return (
+    <div className="card mb-12" style={einkMode ? { borderColor: 'var(--accent)' } : undefined}>
+      <div className="card-title">E-ink mode</div>
+      <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
+        Black-and-white, no-animation layout tuned for e-paper screens. This device only.
+      </p>
+      <button
+        className={`btn btn-sm ${einkMode ? 'btn-primary' : 'btn-secondary'}`}
+        onClick={() => setEinkMode(!einkMode)}
+        aria-pressed={einkMode}
+      >
+        {einkMode ? 'E-ink mode: On' : 'E-ink mode: Off'}
+      </button>
+    </div>
+  )
+}
+
 // ── Test mode toggle (all users, frontend-only) ────────────────────────────────
 
 function TestModeCard() {
@@ -729,6 +740,9 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
 
       {/* Timer sound */}
       <TimerSoundCard />
+
+      {/* E-ink mode */}
+      <EinkModeCard />
 
       {/* Phase 8: Exercise discovery */}
       <div className="card mb-12">

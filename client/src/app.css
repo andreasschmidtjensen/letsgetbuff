@@ -29,6 +29,23 @@
   --radius: 8px;
 }
 
+/* E-ink: grayscale, black on white. Semantic colours collapse to black —
+   meaning is carried by text/shape, not hue. */
+[data-theme="eink"] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface2: #f0f0f0;
+  --border: #000000;
+  --text: #000000;
+  --text-muted: #555555;
+  --accent: #000000;
+  --accent-dim: #e6e6e6;
+  --green: #000000;
+  --red: #000000;
+  --blue: #000000;
+  --radius: 4px;
+}
+
 .mt-4 { margin-top: 4px; }
 
 .app {
@@ -626,3 +643,65 @@ h3 { font-size: 15px; margin: 0 0 8px; }
   min-height: 48px;
   padding: 10px 4px;
 }
+
+/* ── E-ink override layer: flat, high-contrast, no motion ─────────────────────
+   Tuned for a slow-refresh grayscale e-paper screen. */
+[data-theme="eink"] *,
+[data-theme="eink"] *::before,
+[data-theme="eink"] *::after {
+  animation: none !important;
+  transition: none !important;
+  box-shadow: none !important;
+}
+
+[data-theme="eink"] .card { border: 2px solid #000; }
+
+[data-theme="eink"] .btn { font-size: 16px; min-height: 52px; }
+[data-theme="eink"] .btn-sm { font-size: 14px; min-height: 40px; }
+[data-theme="eink"] .btn:active { opacity: 1; }
+[data-theme="eink"] .btn-primary { background: #000; color: #fff; }
+[data-theme="eink"] .btn-secondary { background: #fff; color: #000; border: 2px solid #000; }
+[data-theme="eink"] .btn-danger { background: #fff; color: #000; border: 2px solid #000; }
+
+[data-theme="eink"] .input,
+[data-theme="eink"] .input-sm {
+  font-size: 18px;
+  min-height: 52px;
+  background: #fff;
+  color: #000;
+  border: 2px solid #000;
+}
+
+/* Confirm-set check button: bordered, invert on press/focus */
+[data-theme="eink"] .btn-check { background: #fff; color: #000; border: 2px solid #000; }
+[data-theme="eink"] .btn-check:hover,
+[data-theme="eink"] .btn-check:focus-visible { background: #000; color: #fff; }
+
+/* Status via text + border, not colour */
+[data-theme="eink"] .badge {
+  background: #fff !important;
+  color: #000 !important;
+  border: 1.5px solid #000;
+}
+
+/* Schedule grid: bordered cells, no colour fill */
+[data-theme="eink"] .sched-day { background: #fff; border: 1px solid #000; }
+[data-theme="eink"] .sched-day.today { background: #fff; outline: 2px solid #000; }
+[data-theme="eink"] .sched-day .day-done { color: #000; }
+
+/* Hardcoded-colour spots that would otherwise stay dark */
+[data-theme="eink"] .safety-banner { background: #fff; border: 1.5px solid #000; color: #000; }
+[data-theme="eink"] .rest-timer-overlay { background: rgba(255, 255, 255, 0.92); }
+[data-theme="eink"] .test-mode-banner { background: #000; color: #fff; }
+[data-theme="eink"] .test-mode-banner-exit { background: #fff; color: #000; }
+
+/* "Next exercise" ready: a strong static outline instead of a pulse */
+[data-theme="eink"] .focus-next-ready { outline: 3px solid #000; outline-offset: -3px; }
+
+/* Thicker chart strokes for legibility in black-and-white */
+[data-theme="eink"] svg polyline,
+[data-theme="eink"] svg line { stroke-width: 2; }
+
+/* Taller nav + a clear active marker without colour */
+[data-theme="eink"] .nav-btn { min-height: 56px; font-size: 13px; }
+[data-theme="eink"] .nav-btn.active { color: #000; font-weight: 700; border-top: 3px solid #000; }

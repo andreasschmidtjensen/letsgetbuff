@@ -20,6 +20,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useStore } from '../store/store'
 import { useTestMode } from '../store/testMode'
+import { useEinkMode } from '../store/einkMode'
 import { useLiveOrder } from '../store/useLiveOrder'
 import { playDoneSound, playTimerEnd, preloadTimerSounds } from '../lib/sounds'
 import StartSessionModal from '../components/StartSessionModal'
@@ -78,6 +79,7 @@ interface RestTimerProps {
 }
 
 function RestTimer({ defaultSecs, onDismiss, audioCtx, muted }: RestTimerProps) {
+  const { einkMode } = useEinkMode()
   const [secs, setSecs] = useState(defaultSecs)
   const [running, setRunning] = useState(true)
   const remaining = useRef(defaultSecs)
@@ -120,20 +122,22 @@ function RestTimer({ defaultSecs, onDismiss, audioCtx, muted }: RestTimerProps) 
     <div className="rest-timer-overlay" role="dialog" aria-label="Rest timer" aria-live="polite">
       <div className="rest-timer-card">
         <div className="rest-timer-label">{secs <= 0 ? 'Rest done!' : 'Rest'}</div>
-        <svg viewBox="0 0 80 80" className="rest-timer-ring" aria-hidden="true">
-          <circle cx="40" cy="40" r="34" fill="none" stroke="var(--surface2)" strokeWidth="6"/>
-          <circle
-            cx="40" cy="40" r="34"
-            fill="none"
-            stroke={secs <= 0 ? 'var(--green)' : 'var(--accent)'}
-            strokeWidth="6"
-            strokeDasharray={`${2 * Math.PI * 34}`}
-            strokeDashoffset={`${2 * Math.PI * 34 * (1 - pct)}`}
-            strokeLinecap="round"
-            transform="rotate(-90 40 40)"
-            style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s' }}
-          />
-        </svg>
+        {!einkMode && (
+          <svg viewBox="0 0 80 80" className="rest-timer-ring" aria-hidden="true">
+            <circle cx="40" cy="40" r="34" fill="none" stroke="var(--surface2)" strokeWidth="6"/>
+            <circle
+              cx="40" cy="40" r="34"
+              fill="none"
+              stroke={secs <= 0 ? 'var(--green)' : 'var(--accent)'}
+              strokeWidth="6"
+              strokeDasharray={`${2 * Math.PI * 34}`}
+              strokeDashoffset={`${2 * Math.PI * 34 * (1 - pct)}`}
+              strokeLinecap="round"
+              transform="rotate(-90 40 40)"
+              style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s' }}
+            />
+          </svg>
+        )}
         <div className="rest-timer-time" aria-label={`${mins} minutes ${secsPart} seconds remaining`}>
           {display}
         </div>
@@ -165,6 +169,7 @@ interface ExerciseTimerProps {
 // reports the achieved seconds back so the set can be logged. Length is adjustable
 // on the fly (±15s). Completes naturally at 0, or early via "Done".
 function ExerciseTimer({ targetSecs, onComplete, onCancel, audioCtx, onAudioCtxInit, muted }: ExerciseTimerProps) {
+  const { einkMode } = useEinkMode()
   const [total, setTotal] = useState(targetSecs)
   const [secs, setSecs] = useState(targetSecs)
   const [running, setRunning] = useState(true)
@@ -222,20 +227,22 @@ function ExerciseTimer({ targetSecs, onComplete, onCancel, audioCtx, onAudioCtxI
     <div className="rest-timer-overlay" role="dialog" aria-label="Exercise timer" aria-live="polite">
       <div className="rest-timer-card exercise-timer-card">
         <div className="rest-timer-label">{secs <= 0 ? 'Done!' : 'Hold'}</div>
-        <svg viewBox="0 0 80 80" className="rest-timer-ring exercise-timer-ring" aria-hidden="true">
-          <circle cx="40" cy="40" r="34" fill="none" stroke="var(--surface2)" strokeWidth="6"/>
-          <circle
-            cx="40" cy="40" r="34"
-            fill="none"
-            stroke={secs <= 0 ? 'var(--green)' : 'var(--accent)'}
-            strokeWidth="6"
-            strokeDasharray={`${2 * Math.PI * 34}`}
-            strokeDashoffset={`${2 * Math.PI * 34 * (1 - pct)}`}
-            strokeLinecap="round"
-            transform="rotate(-90 40 40)"
-            style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s' }}
-          />
-        </svg>
+        {!einkMode && (
+          <svg viewBox="0 0 80 80" className="rest-timer-ring exercise-timer-ring" aria-hidden="true">
+            <circle cx="40" cy="40" r="34" fill="none" stroke="var(--surface2)" strokeWidth="6"/>
+            <circle
+              cx="40" cy="40" r="34"
+              fill="none"
+              stroke={secs <= 0 ? 'var(--green)' : 'var(--accent)'}
+              strokeWidth="6"
+              strokeDasharray={`${2 * Math.PI * 34}`}
+              strokeDashoffset={`${2 * Math.PI * 34 * (1 - pct)}`}
+              strokeLinecap="round"
+              transform="rotate(-90 40 40)"
+              style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s' }}
+            />
+          </svg>
+        )}
         <div className="rest-timer-time exercise-timer-time" aria-label={`${mins} minutes ${secsPart} seconds remaining`}>
           {display}
         </div>

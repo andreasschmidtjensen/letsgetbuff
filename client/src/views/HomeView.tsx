@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../store/store'
+import { useEinkMode } from '../store/einkMode'
 import { computeProgramWeek, phaseFor, scheduleFor, isoWeekKey, weekKeyToMonday, todayDayName, activityLabel, DayActivity } from '@letsgetbuff/shared'
 import { dateKey, keyToDate, addDays } from '../lib/date'
 import type { Tab, Session } from '@letsgetbuff/shared'
@@ -60,6 +61,7 @@ function sessionActivity(w: Session['workout']): DayActivity {
 
 export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const { state, dispatch } = useStore()
+  const { einkMode } = useEinkMode()
   const today = new Date()
   const todayStr = dateKey(today)
   const currentWeekKey = isoWeekKey(today)
@@ -112,6 +114,91 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
   const viewSchedule = scheduleFor(viewProgramWeek)
   const startWeekKey = isoWeekKey(keyToDate(state.startDate))
   const canGoBack = viewWeekKey > startWeekKey
+
+  // ── E-ink layout: simplified, large, text-first, no colour grid ──────────────
+  if (einkMode) {
+    const thisMonday = weekKeyToMonday(currentWeekKey)
+    const isTodayGym = todayActivity === 'gym-a' || todayActivity === 'gym-b'
+    return (
+      <div>
+        <div className="card">
+          <div style={{ fontSize: 15, fontWeight: 700 }}>
+            WEEK {programWeek} / 26 · PHASE {phaseFor(programWeek).phase}
+          </div>
+          <div className="muted" style={{ fontSize: 13 }}>{phaseLabel}</div>
+        </div>
+
+        <div className="card">
+          <div className="card-title">Today</div>
+          <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>
+            {activityLabel(todayDisplayActivity)}{todaySession?.done ? ' ✓' : ''}
+          </div>
+          {isTodayGym && !todaySession?.done && (
+            <button className="btn btn-primary w-full" onClick={() => onNavigate('workout')}>
+              Open Workout {todayActivity === 'gym-a' ? 'A' : 'B'}
+            </button>
+          )}
+          {(todayActivity === 'bike' || todayActivity === 'run') && !todaySession?.done && (
+            <button className="btn btn-secondary w-full" onClick={() => dispatch({ type: 'MARK_DAY_DONE', date: todayStr, workout: todayActivity })}>
+              Mark {activityLabel(todayActivity)} done
+            </button>
+          )}
+          {todayActivity === 'rest' && !todaySession?.done && (
+            <button className="btn btn-secondary w-full" onClick={() => dispatch({ type: 'MARK_DAY_DONE', date: todayStr, workout: 'rest' })}>
+              Mark rest day
+            </button>
+          )}
+          {todaySession?.done && (
+            <button className="btn btn-secondary w-full" onClick={() => dispatch({ type: 'UNMARK_DAY_DONE', date: todayStr })}>
+              Undo
+            </button>
+          )}
+        </div>
+
+        {nextGym && nextGym.dateKey !== todayStr && (
+          <div className="card">
+            <div className="card-title">Next gym session</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>Workout {nextGym.workout}</div>
+            <div className="muted" style={{ fontSize: 14 }}>
+              {nextGym.date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+            </div>
+          </div>
+        )}
+
+        <div className="card">
+          <div className="card-title">This week</div>
+          {DAY_KEYS.map((dk, i) => {
+            const cellKey = dateKey(addDays(thisMonday, i))
+            const sess = state.sessions[cellKey]
+            const act = sess ? sessionActivity(sess.workout) : schedule[dk]
+            const isToday = cellKey === todayStr
+            return (
+              <div
+                key={dk}
+                style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  padding: '8px 0', borderBottom: '1px solid var(--border)',
+                  fontWeight: isToday ? 700 : 400, fontSize: 15,
+                }}
+              >
+                <span>{DAY_LABELS[i]}{isToday ? ' (today)' : ''}</span>
+                <span>{activityLabel(act)}{sess?.done ? ' ✓' : ''}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        {isSkipped && (
+          <div className="card">
+            <span className="muted">This week is marked skipped.</span>
+            <button className="btn btn-secondary w-full mt-8" onClick={() => dispatch({ type: 'UNSKIP_WEEK', weekKey: currentWeekKey })}>
+              Undo skip
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { StoreProvider } from './store/store'
 import { TestModeProvider } from './store/testMode'
+import { EinkModeProvider } from './store/einkMode'
 import { Tab, Privilege } from '@letsgetbuff/shared'
 import HomeView from './views/HomeView'
 import WorkoutView from './views/WorkoutView'
@@ -113,10 +114,12 @@ export default function App() {
   }
 
   return (
-    <TestModeProvider>
-      <StoreProvider username={username!}>
-        <AppInner username={username!} level={level} onLogout={onLogout} />
-      </StoreProvider>
-    </TestModeProvider>
+    <EinkModeProvider>
+      <TestModeProvider>
+        <StoreProvider username={username!}>
+          <AppInner username={username!} level={level} onLogout={onLogout} />
+        </StoreProvider>
+      </TestModeProvider>
+    </EinkModeProvider>
   )
 }
