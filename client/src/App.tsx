@@ -60,6 +60,18 @@ function useAuth() {
   return { authState, username, level, onLogin, onLogout }
 }
 
+function HeaderVersion() {
+  const [version, setVersion] = useState<number | null>(null)
+  useEffect(() => {
+    fetch('/api/health')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.version != null) setVersion(d.version) })
+      .catch(() => { /* offline — leave blank */ })
+  }, [])
+  if (version == null) return null
+  return <span className="app-version">v{version}</span>
+}
+
 function AppInner({ username, level, onLogout }: { username: string; level: Privilege; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('home')
   const { einkMode, setEinkMode } = useEinkMode()
@@ -68,7 +80,10 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
     <div className="app">
       <TestModeBanner />
       <header className="app-header">
-        <span className="app-title">Let's Get Buff</span>
+        <div className="app-title-wrap">
+          <span className="app-title">Let's Get Buff</span>
+          <HeaderVersion />
+        </div>
         <button
           className="theme-toggle"
           onClick={() => setEinkMode(!einkMode)}

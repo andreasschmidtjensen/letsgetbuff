@@ -65,12 +65,23 @@
   align-items: center;
 }
 
-.app-title {
+.app-title-wrap {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.app-title {
   font-size: 18px;
   font-weight: 700;
   color: var(--accent);
   letter-spacing: -0.3px;
+}
+
+.app-version {
+  font-size: 10px;
+  color: var(--text-muted);
 }
 
 /* Username, right side of the header */
