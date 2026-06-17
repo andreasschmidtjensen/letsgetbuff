@@ -66,10 +66,33 @@
 }
 
 .app-title {
+  flex: 1;
   font-size: 18px;
   font-weight: 700;
   color: var(--accent);
   letter-spacing: -0.3px;
+}
+
+/* Username, right side of the header */
+.header-user {
+  flex: 1;
+  text-align: right;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Centered colour-scheme (e-ink) toggle in the header */
+.theme-toggle {
+  flex-shrink: 0;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .app-main {

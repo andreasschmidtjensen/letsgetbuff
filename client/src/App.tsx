@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { StoreProvider } from './store/store'
 import { TestModeProvider } from './store/testMode'
-import { EinkModeProvider } from './store/einkMode'
+import { EinkModeProvider, useEinkMode } from './store/einkMode'
 import { Tab, Privilege } from '@letsgetbuff/shared'
 import HomeView from './views/HomeView'
 import WorkoutView from './views/WorkoutView'
@@ -62,15 +62,23 @@ function useAuth() {
 
 function AppInner({ username, level, onLogout }: { username: string; level: Privilege; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('home')
+  const { einkMode, setEinkMode } = useEinkMode()
 
   return (
     <div className="app">
       <TestModeBanner />
       <header className="app-header">
         <span className="app-title">Let's Get Buff</span>
-        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
-          {username}
-        </span>
+        <button
+          className="theme-toggle"
+          onClick={() => setEinkMode(!einkMode)}
+          aria-pressed={einkMode}
+          title="Toggle e-ink / colour theme"
+          aria-label={einkMode ? 'Switch to colour theme' : 'Switch to e-ink theme'}
+        >
+          {einkMode ? '● Colour' : '◐ E-ink'}
+        </button>
+        <span className="header-user">{username}</span>
       </header>
       <main className="app-main">
         {tab === 'home'      && <HomeView onNavigate={setTab} />}
