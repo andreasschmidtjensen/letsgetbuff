@@ -178,6 +178,7 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
                 style={{
                   display: 'flex', justifyContent: 'space-between',
                   padding: '8px 0', borderBottom: '1px solid var(--border)',
+                  color: 'var(--text)',
                   fontWeight: isToday ? 700 : 400, fontSize: 15,
                 }}
               >

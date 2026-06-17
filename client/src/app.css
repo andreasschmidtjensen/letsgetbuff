@@ -48,6 +48,14 @@
 
 .mt-4 { margin-top: 4px; }
 
+/* Follow the active theme for any inherited text/background — index.html sets a
+   hardcoded dark body colour that would otherwise leak into e-ink (light grey
+   text on white). */
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
 .app {
   display: flex;
   flex-direction: column;
