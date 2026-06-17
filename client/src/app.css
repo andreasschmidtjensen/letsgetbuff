@@ -34,12 +34,12 @@
 [data-theme="eink"] {
   --bg: #ffffff;
   --surface: #ffffff;
-  --surface2: #f0f0f0;
+  --surface2: #e6e6e6;
   --border: #000000;
   --text: #000000;
-  --text-muted: #555555;
+  --text-muted: #333333;
   --accent: #000000;
-  --accent-dim: #e6e6e6;
+  --accent-dim: #d6d6d6;
   --green: #000000;
   --red: #000000;
   --blue: #000000;
@@ -707,9 +707,11 @@ h3 { font-size: 15px; margin: 0 0 8px; }
   border: 1.5px solid #000;
 }
 
-/* Schedule grid: bordered cells, no colour fill */
+/* Schedule grid: bordered cells, all text solid black for legibility */
 [data-theme="eink"] .sched-day { background: #fff; border: 1px solid #000; }
 [data-theme="eink"] .sched-day.today { background: #fff; outline: 2px solid #000; }
+[data-theme="eink"] .sched-day .day-name,
+[data-theme="eink"] .sched-day .day-act,
 [data-theme="eink"] .sched-day .day-done { color: #000; }
 
 /* Hardcoded-colour spots that would otherwise stay dark */
