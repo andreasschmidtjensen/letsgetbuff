@@ -101,7 +101,12 @@ export interface ServerStateResponse {
 export async function fetchServerState(): Promise<ServerStateResponse> {
   const res = await fetch('/api/state', { credentials: 'include' })
   if (!res.ok) throw new Error(`GET /api/state failed: ${res.status}`)
-  return res.json() as Promise<ServerStateResponse>
+  const body = (await res.json()) as ServerStateResponse
+  // Server blobs are migrated through the same ladder as local cache — a pre-v3
+  // server state lacks stretchSessions/stretchSchedule, which would crash views
+  // that read them. Fall back to the raw blob only if it's unrecognisable.
+  const upgraded = upgrade(body.state)
+  return { ...body, state: upgraded ?? body.state }
 }
 
 export async function putServerState(state: AppState): Promise<{ ok: boolean; updatedAt: string }> {
