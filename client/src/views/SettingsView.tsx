@@ -538,6 +538,30 @@ function TestModeCard() {
   )
 }
 
+
+// Stretch schedule toggle (synced — drives the overview)
+function StretchScheduleCard() {
+  const { state, dispatch } = useStore()
+  const on = state.stretchSchedule.enabled
+  return (
+    <div className="card mb-12">
+      <div className="card-title">Stretch schedule</div>
+      <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
+        Schedules optional stretching every other day (Mon / Wed / Fri), avoiding your gym days, and shows it on your
+        overview. Stretching is always available from the Stretch tab even when this is off. This setting syncs across
+        your devices.
+      </p>
+      <button
+        className={`btn btn-sm ${on ? 'btn-primary' : 'btn-secondary'}`}
+        aria-pressed={on}
+        onClick={() => dispatch({ type: 'SET_STRETCH_SCHEDULE', enabled: !on })}
+      >
+        {on ? 'Stretch schedule: On' : 'Stretch schedule: Off'}
+      </button>
+    </div>
+  )
+}
+
 // ── Main SettingsView ──────────────────────────────────────────────────────────
 
 export default function SettingsView({ onLogout, level }: Props = {}) {
@@ -653,6 +677,9 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
 
       {/* Test mode (frontend-only sandbox) */}
       <TestModeCard />
+
+      {/* Stretch schedule (Phase 18) */}
+      <StretchScheduleCard />
 
       {/* Start date */}
       <div className="card mb-12">
