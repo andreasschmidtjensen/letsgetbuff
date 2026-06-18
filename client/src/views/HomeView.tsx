@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store/store'
 import { useEinkMode } from '../store/einkMode'
-import { computeProgramWeek, phaseFor, scheduleFor, isoWeekKey, weekKeyToMonday, todayDayName, activityLabel, isStretchDay, DayActivity } from '@letsgetbuff/shared'
+import { computeProgramWeek, phaseFor, scheduleFor, isoWeekKey, weekKeyToMonday, todayDayName, activityLabel, DayActivity } from '@letsgetbuff/shared'
 import { dateKey, keyToDate, addDays } from '../lib/date'
 import type { Tab, Session } from '@letsgetbuff/shared'
 
@@ -104,8 +104,6 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
   const todaySession = state.sessions[todayStr]
   // What to display for "Today": the logged workout if one exists, else the scheduled activity
   const todayDisplayActivity = todaySession ? sessionActivity(todaySession.workout) : todayActivity
-  const stretchTodayEnabled = isStretchDay(programWeek, todayDay, state.stretchSchedule.enabled)
-  const stretchDoneToday = Boolean(state.stretchSessions[todayStr]?.done)
 
   const nextGym = nextGymSession(state.startDate, state.skippedWeeks, state.sessions, today)
 
@@ -153,11 +151,6 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
           {todaySession?.done && (
             <button className="btn btn-secondary w-full" onClick={() => dispatch({ type: 'UNMARK_DAY_DONE', date: todayStr })}>
               Undo
-            </button>
-          )}
-          {stretchTodayEnabled && (
-            <button className="btn btn-secondary w-full mt-8" onClick={() => onNavigate('stretch')}>
-              Stretch (optional){stretchDoneToday ? ' ✓' : ''}
             </button>
           )}
         </div>
@@ -288,15 +281,6 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
             Undo
           </button>
         )}
-        {stretchTodayEnabled && (
-          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-            <div className="row gap-8" style={{ alignItems: 'center' }}>
-              <span style={{ fontSize: 14, color: 'var(--green)' }}>Stretch (optional)</span>
-              {stretchDoneToday && <span className="badge badge-green">Done</span>}
-              <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => onNavigate('stretch')}>Open &rarr;</button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Weekly schedule */}
@@ -332,11 +316,6 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
                 <span className="day-name">{DAY_LABELS[i]}</span>
                 <span className="day-act" style={{ color: activityColor(act) }}>{activityBadge(act)}</span>
                 {sess?.done && <span className="day-done">✓</span>}
-                {isStretchDay(viewProgramWeek, dk, state.stretchSchedule.enabled) && (
-                  <span title="Stretch day" style={{ color: 'var(--green)', fontSize: 10, marginTop: 2 }}>
-                    {state.stretchSessions[cellKey]?.done ? 'str ✓' : 'str'}
-                  </span>
-                )}
               </div>
             )
           })}

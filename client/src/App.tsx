@@ -5,7 +5,6 @@ import { EinkModeProvider, useEinkMode } from './store/einkMode'
 import { Tab, Privilege } from '@letsgetbuff/shared'
 import HomeView from './views/HomeView'
 import WorkoutView from './views/WorkoutView'
-import StretchView from './views/StretchView'
 import MetricsView from './views/MetricsView'
 import MilestonesView from './views/MilestonesView'
 import SettingsView from './views/SettingsView'
@@ -17,7 +16,6 @@ import './app.css'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'home', label: 'Home' },
   { id: 'workout', label: 'Workout' },
-  { id: 'stretch', label: 'Stretch' },
   { id: 'history', label: 'History' },
   { id: 'metrics', label: 'Metrics' },
   { id: 'milestones', label: 'Goals' },
@@ -99,8 +97,7 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
       </header>
       <main className="app-main">
         {tab === 'home'      && <HomeView onNavigate={setTab} />}
-        {tab === 'workout'   && <WorkoutView username={username} level={level} onNavigate={setTab} />}
-        {tab === 'stretch'   && <StretchView />}
+        {tab === 'workout'   && <WorkoutView username={username} level={level} />}
         {tab === 'history'   && <HistoryView username={username} />}
         {tab === 'metrics'   && <MetricsView />}
         {tab === 'milestones'&& <MilestonesView />}

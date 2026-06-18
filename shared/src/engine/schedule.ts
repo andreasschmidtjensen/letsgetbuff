@@ -11,6 +11,8 @@ export function isoWeekKey(date: Date): string {
 }
 
 // Parse ISO week key back to the Monday of that week, as a LOCAL Date at noon.
+// (The ISO-week algebra is done in UTC to stay DST-proof, then handed back as a
+// local civil date so callers can compare/format it with the local date helpers.)
 export function weekKeyToMonday(key: string): Date {
   const [year, w] = key.split('-W').map(Number)
   const jan4 = new Date(Date.UTC(year, 0, 4)) // Jan 4 is always in week 1
@@ -25,6 +27,7 @@ export function computeProgramWeek(startDate: string, skippedWeeks: string[], to
   const startKey = isoWeekKey(keyToDate(startDate))
   const todayWeekKey = isoWeekKey(today)
 
+  // Walk ISO weeks from startKey up to todayWeekKey, counting non-skipped weeks.
   let current = weekKeyToMonday(startKey)
   const skippedSet = new Set(skippedWeeks)
   let count = 0
@@ -65,14 +68,18 @@ const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
 export type DayName = typeof DAYS[number]
 
 export function scheduleFor(week: number): WeekSchedule {
+  // Phase 1 (wk 1-4): Tue Gym A, Sat Gym B, rest = rest
   if (week <= 4) {
     return { mon: 'rest', tue: 'gym-a', wed: 'rest', thu: 'rest', fri: 'rest', sat: 'gym-b', sun: 'rest' }
   }
+  // From wk 13+: Sat = bike ride (not Gym B)
   const satActivity: DayActivity = week >= 13 ? 'bike' : 'gym-b'
 
+  // Phase 2 wk 5-8: Tue Gym A, Wed bike/run, Fri bike/run, Sat Gym B
   if (week <= 8) {
     return { mon: 'rest', tue: 'gym-a', wed: 'bike', thu: 'rest', fri: 'bike', sat: satActivity, sun: 'rest' }
   }
+  // Phase 2 wk 9-16, Phase 3 wk 17-26: same structure
   return { mon: 'rest', tue: 'gym-a', wed: 'bike', thu: 'rest', fri: 'bike', sat: satActivity, sun: 'rest' }
 }
 
@@ -90,18 +97,4 @@ export function activityLabel(activity: DayActivity): string {
     case 'run': return 'Run'
     case 'rest': return 'Rest'
   }
-}
-
-// Optional stretch schedule (Phase 18). A separate layer over the day, not a
-// DayActivity (a stretch can co-occur with rest/cardio, and is logged
-// independently). Rule: every-other-day cadence, hand-tuned per phase to never
-// fall on a gym (A/B) day, no two stretch days consecutive. Mon/Wed/Fri
-// satisfies that for every phase, so it's a single source of truth.
-export function stretchScheduleFor(_week: number): Set<DayName> {
-  return new Set<DayName>(['mon', 'wed', 'fri'])
-}
-
-// Whether a weekday is a scheduled stretch day, gated by the user preference.
-export function isStretchDay(week: number, day: DayName, enabled: boolean): boolean {
-  return enabled && stretchScheduleFor(week).has(day)
 }

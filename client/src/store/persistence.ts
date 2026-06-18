@@ -3,9 +3,12 @@ import { todayKey } from '../lib/date'
 
 export const STORAGE_KEY = 'letsgetbuff-v1'
 
-// Exercise ids that used to exist in the catalog but were removed.
+// Exercise ids that used to exist in the catalog but were removed. Any logged
+// entry still referencing one is dropped during migration so stale ids don't
+// linger in user data (and don't confuse "last session" lookups).
 const REMOVED_EXERCISE_IDS = ['back-extension', 'tricep-pushdown', 'bird-dog']
 
+// A migration is a pure step that upgrades a state blob from version N to N+1.
 type Migration = (state: Record<string, unknown>) => Record<string, unknown>
 
 const MIGRATIONS: Record<number, Migration> = {
@@ -22,12 +25,6 @@ const MIGRATIONS: Record<number, Migration> = {
     }
     return { ...state, sessions: sessionsOut }
   },
-  // 2 -> 3: introduce the optional stretch log + schedule preference. Purely additive.
-  2: (state) => ({
-    ...state,
-    stretchSessions: (state.stretchSessions ?? {}),
-    stretchSchedule: (state.stretchSchedule ?? { enabled: true }),
-  }),
 }
 
 // Run the migration ladder from `fromVersion` up to SCHEMA_VERSION.
@@ -45,8 +42,6 @@ export function migrate(state: Record<string, unknown>, fromVersion: number): Ap
 function isPlausibleState(raw: unknown): raw is Record<string, unknown> {
   if (typeof raw !== 'object' || raw === null) return false
   const o = raw as Record<string, unknown>
-  // Tolerant: stretchSessions / stretchSchedule are NOT required here, so pre-v3
-  // backups still import (the 2->3 migration fills them in).
   return (
     typeof o.sessions === 'object' && o.sessions !== null &&
     typeof o.metrics === 'object' && o.metrics !== null &&
@@ -68,7 +63,7 @@ function upgrade(raw: unknown): AppState | null {
   }
 }
 
-// localStorage (offline cache)
+// ── localStorage (offline cache) ─────────────────────────────────────────────
 
 export function loadLocalState(): AppState | null {
   try {
@@ -91,7 +86,7 @@ export function saveLocalState(state: AppState): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
-// Server sync
+// ── Server sync ───────────────────────────────────────────────────────────────
 
 export interface ServerStateResponse {
   state: AppState
@@ -115,8 +110,9 @@ export async function putServerState(state: AppState): Promise<{ ok: boolean; up
   return res.json() as Promise<{ ok: boolean; updatedAt: string }>
 }
 
-// Migration tracking
+// ── Migration tracking ────────────────────────────────────────────────────────
 
+/** Per-user flag so we don't re-migrate another user's localStorage data. */
 export function isMigrated(username: string): boolean {
   return localStorage.getItem(`letsgetbuff-migrated-${username}`) === '1'
 }
@@ -125,7 +121,7 @@ export function markMigrated(username: string): void {
   localStorage.setItem(`letsgetbuff-migrated-${username}`, '1')
 }
 
-// Export / Import
+// ── Export / Import ───────────────────────────────────────────────────────────
 
 export function exportData(state: AppState): void {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' })
@@ -137,6 +133,7 @@ export function exportData(state: AppState): void {
   URL.revokeObjectURL(url)
 }
 
+// Validate (and migrate) an imported blob. Returns null if unrecognisable.
 export function validateImport(raw: unknown): AppState | null {
   return upgrade(raw)
 }

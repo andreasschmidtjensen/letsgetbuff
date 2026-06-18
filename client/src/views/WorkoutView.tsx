@@ -30,7 +30,7 @@ import { todayKey, keyToDate } from '../lib/date'
 import { getWorkoutExercises, getWorkout, ExerciseDef } from '@letsgetbuff/shared'
 import { suggestNextWeight, repTargetFor, repBandFor } from '@letsgetbuff/shared'
 import { ExerciseEntry, SetEntry, Session } from '@letsgetbuff/shared'
-import type { Privilege, Tab } from '@letsgetbuff/shared'
+import type { Privilege } from '@letsgetbuff/shared'
 
 const MUTE_KEY = 'letsgetbuff-mute'
 const REST_SECS_KEY = 'letsgetbuff-rest-secs'
@@ -892,7 +892,7 @@ const WORKOUT_OPTIONS: { value: Session['workout']; label: string }[] = [
   { value: 'rest', label: 'Rest' },
 ]
 
-export default function WorkoutView({ username, level, onNavigate }: { username: string; level?: Privilege; onNavigate?: (tab: Tab) => void }) {
+export default function WorkoutView({ username, level }: { username: string; level?: Privilege }) {
   const readOnly = level === 'viewer'
   const { state, dispatch, syncStatus } = useStore()
   const todayStr = todayKey()
@@ -1320,17 +1320,6 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
             <p className="muted" style={{ margin: 0 }}>
               {workoutType === 'bike' ? 'Bike / Run day - no set logging needed.' : 'Rest day.'}
             </p>
-          </div>
-        )}
-
-        {onNavigate && (
-          <div className="card mb-12">
-            <div className="card-title">Optional stretch</div>
-            <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
-              Mobility &amp; flexibility, logged separately from this workout.
-              {(workoutType === 'A' || workoutType === 'B' || workoutType === 'bike') ? ' A warm-up flow is available there too.' : ''}
-            </p>
-            <button className="btn btn-secondary btn-sm" onClick={() => onNavigate('stretch')}>Open stretch &rarr;</button>
           </div>
         )}
 
