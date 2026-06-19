@@ -107,7 +107,7 @@ export const WORKOUTS: WorkoutDef[] = [
         requiresKg: true,
         videoUrls: ['https://www.youtube.com/shorts/2D0TyoHv_EY'],
         alternatives: ['Standing shoulder press', 'Arnold press'],
-        notes: 'Press straight up, avoid arching the lower back.',
+        notes: 'Press straight up, avoid arching the lower back. Keep shoulders pulled DOWN (don\'t shrug toward your ears) and jaw loose. Breathe out as you press up — don\'t hold your breath.',
         safetyCues: [],
         repProgression: {
           band1: { sets: 3, reps: 10 },
@@ -226,7 +226,7 @@ export const WORKOUTS: WorkoutDef[] = [
           'https://www.youtube.com/shorts/AYqg9S5FrUU', // SquatCouple
         ],
         alternatives: ['Tricep Pushdown', 'Close-grip Push-up'],
-        notes: 'Hold one dumbbell with both hands overhead. Elbows close to head.',
+        notes: 'Hold one dumbbell with both hands overhead. Elbows close to head. Keep your jaw loose and shoulders relaxed (don\'t shrug). Breathe steadily through each rep — don\'t hold your breath.',
         safetyCues: [],
         repProgression: {
           band1: { sets: 2, reps: 12 },
