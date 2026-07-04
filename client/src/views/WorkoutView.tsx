@@ -301,7 +301,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
         />
       )}
 
-      <div>
+      <div className="view-narrow">
         {readOnly && (
           <div className="card mb-12" role="note" style={{ borderColor: 'var(--text-muted)' }}>
             <span className="muted" style={{ fontSize: 13 }}>

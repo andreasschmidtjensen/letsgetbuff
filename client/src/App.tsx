@@ -99,13 +99,15 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
         <span className="header-user">{username}</span>
       </header>
       <main className="app-main">
-        {tab === 'home'      && <HomeView onNavigate={setTab} />}
-        {tab === 'workout'   && <WorkoutView username={username} level={level} onNavigate={setTab} />}
-        {tab === 'stretch'   && <StretchView />}
-        {tab === 'history'   && <HistoryView username={username} />}
-        {tab === 'metrics'   && <MetricsView />}
-        {tab === 'milestones'&& <MilestonesView />}
-        {tab === 'settings'  && <SettingsView onLogout={onLogout} level={level} />}
+        <div className="view-container">
+          {tab === 'home'      && <HomeView onNavigate={setTab} />}
+          {tab === 'workout'   && <WorkoutView username={username} level={level} onNavigate={setTab} />}
+          {tab === 'stretch'   && <StretchView />}
+          {tab === 'history'   && <HistoryView username={username} />}
+          {tab === 'metrics'   && <MetricsView />}
+          {tab === 'milestones'&& <MilestonesView />}
+          {tab === 'settings'  && <SettingsView onLogout={onLogout} level={level} />}
+        </div>
       </main>
       <nav className="app-nav">
         {TABS.map(t => (

@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../store/store'
+import { useContainerWidth } from '../lib/useContainerWidth'
 import { WORKOUTS } from '@letsgetbuff/shared'
 import type { ExerciseDef, Session } from '@letsgetbuff/shared'
 
@@ -42,6 +43,8 @@ function LineChart({
   secondaryLabel?: string
   unit?: string
 }) {
+  // Hook must run unconditionally — keep it above the early return.
+  const { ref, width: W } = useContainerWidth<HTMLDivElement>()
   const primaryOk = points.length >= 2
   const secondaryOk = (secondaryPoints?.length ?? 0) >= 2
 
@@ -53,7 +56,6 @@ function LineChart({
     )
   }
 
-  const W = 320
   const H = 100
   const PAD = { top: 8, right: 8, bottom: 24, left: 36 }
   const innerW = W - PAD.left - PAD.right
@@ -98,7 +100,7 @@ function LineChart({
   ]
 
   return (
-    <div>
+    <div ref={ref}>
       {(label || secondaryLabel) && (
         <div className="row gap-8 mb-8" style={{ fontSize: 11 }}>
           {label && primaryOk && (
@@ -117,7 +119,7 @@ function LineChart({
       )}
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', maxWidth: W, display: 'block' }}
+        style={{ width: '100%', display: 'block' }}
         aria-hidden="true"
       >
         {yLabels.map(({ val, y }) => (
@@ -246,8 +248,8 @@ export default function HistoryView({ username }: { username: string }) {
 
   const latest = myDataPoints[myDataPoints.length - 1]
   const first = myDataPoints[0]
-  const gainKg = hasData && myDataPoints.length >= 2 ? latest.topKg - first.topKg : null
-  const gainIrm = hasData && myDataPoints.length >= 2 ? latest.e1rm - first.e1rm : null
+  const gainKg = hasData && myDataPoints.length >= 2 ? Math.round((latest.topKg - first.topKg) * 10) / 10 : null
+  const gainIrm = hasData && myDataPoints.length >= 2 ? Math.round((latest.e1rm - first.e1rm) * 10) / 10 : null
 
   // ── Volume tab ───────────────────────────────────────────────────────────
 
@@ -277,7 +279,7 @@ export default function HistoryView({ username }: { username: string }) {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div>
+    <div className="cards-grid">
       <h2>History</h2>
 
       <div className="row gap-8 mb-12">

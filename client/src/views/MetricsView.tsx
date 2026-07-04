@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../store/store'
+import { useContainerWidth } from '../lib/useContainerWidth'
 import { todayKey } from '@letsgetbuff/shared'
 
 type MetricKey = 'bodyweightKg' | 'sleepHrs' | 'proteinG'
@@ -50,9 +51,10 @@ function MetricChart({
   targetLabel?: string
   smoothed?: (number | null)[]
 }) {
+  // Hook must run unconditionally — keep it above the early return.
+  const { ref, width: W } = useContainerWidth<HTMLDivElement>()
   if (points.length < 2) return null
 
-  const W = 320
   const H = 100
   const PAD = { top: 8, right: 8, bottom: 22, left: 36 }
   const innerW = W - PAD.left - PAD.right
@@ -90,7 +92,8 @@ function MetricChart({
   const maxD = points[points.length - 1].date
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, display: 'block' }} aria-hidden="true">
+    <div ref={ref}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }} aria-hidden="true">
       {[minV, maxV].map((v, i) => (
         <text key={i} x={PAD.left - 4} y={i === 0 ? PAD.top + innerH + 3 : PAD.top + 4} textAnchor="end" fontSize={9} fill="var(--text-muted)">
           {v % 1 === 0 ? Math.round(v) : v.toFixed(1)}{unit}
@@ -115,6 +118,7 @@ function MetricChart({
         <circle key={p.date} cx={toX(p.date)} cy={toY(p.value)} r={2.5} fill={color} opacity={0.6} />
       ))}
     </svg>
+    </div>
   )
 }
 
@@ -149,7 +153,7 @@ export default function MetricsView() {
   const dateKeys = Object.keys(state.metrics).sort()
 
   return (
-    <div>
+    <div className="cards-grid">
       <h2>Body Metrics</h2>
 
       <div className="card mb-12">

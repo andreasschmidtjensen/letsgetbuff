@@ -46,6 +46,16 @@
   --radius: 4px;
 }
 
+/* Layout tokens (theme-independent) — used by the responsive layer at the
+   bottom of this file. */
+:root {
+  --sidebar-w: 200px;
+  --content-max: 720px;
+}
+@media (min-width: 1024px) {
+  :root { --content-max: 1040px; }
+}
+
 .mt-4 { margin-top: 4px; }
 
 /* Follow the active theme for any inherited text/background — index.html sets a
@@ -124,6 +134,7 @@ body {
   display: flex;
   background: var(--surface);
   border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
 .nav-btn {
@@ -749,3 +760,92 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 /* Taller nav + a clear active marker without colour */
 [data-theme="eink"] .nav-btn { min-height: 56px; font-size: 13px; }
 [data-theme="eink"] .nav-btn.active { color: #000; font-weight: 700; border-top: 3px solid #000; }
+
+/* ── Responsive layer: tablet (≥768px) & desktop (≥1024px) ────────────────────
+   Everything below is additive — under 768px the phone layout above is
+   untouched. Placed after the eink layer so equal-specificity ties resolve
+   here by source order. */
+
+@media (min-width: 768px) {
+  /* Shell: bottom tab bar becomes a left sidebar via grid areas. Source order
+     of .app's children doesn't matter in grid. The banner row collapses to 0
+     when TestModeBanner renders nothing. */
+  .app {
+    max-width: none;
+    display: grid;
+    grid-template-columns: var(--sidebar-w) 1fr;
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "banner banner"
+      "nav    header"
+      "nav    main";
+  }
+  .test-mode-banner { grid-area: banner; }
+  .app-header { grid-area: header; }
+  .app-main {
+    grid-area: main;
+    padding: 24px 32px;
+  }
+  .app-nav {
+    grid-area: nav;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 12px 8px;
+    border-top: none;
+    border-right: 1px solid var(--border);
+  }
+  .nav-btn {
+    flex: 0 0 auto;
+    text-align: left;
+    padding: 12px 14px;
+    font-size: 14px;
+    border-radius: var(--radius);
+  }
+  .nav-btn.active { background: var(--accent-dim); }
+  /* eink active marker was a top border on the bottom bar — in the sidebar it
+     becomes a left bar */
+  [data-theme="eink"] .nav-btn.active { border-top: none; border-left: 3px solid #000; }
+
+  /* Focus mode: the overlay itself stays full-bleed so it keeps covering (and
+     blocking clicks to) the sidebar and app behind it; its content centers in
+     a 760px column instead. */
+  .focus-overlay { max-width: none; }
+  .focus-overlay > .focus-header,
+  .focus-overlay > .focus-body,
+  .focus-overlay > .focus-nav {
+    width: 100%;
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Per-view content width */
+  .view-container { max-width: var(--content-max); margin: 0 auto; }
+  .view-narrow { max-width: 760px; margin: 0 auto; }
+
+  /* Home: 2-column dashboard; banner + weekly schedule span full width */
+  .home-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+  .home-grid > .card { margin-bottom: 0; }
+  .home-grid > .card:first-child,
+  .home-grid > .card.card-wide { grid-column: 1 / -1; }
+}
+
+@media (min-width: 1024px) {
+  /* History / Metrics / Settings: two-column card grids. Headings and .row
+     toolbars span both columns; fixed-position dialogs are out of flow. */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+  .cards-grid > h2,
+  .cards-grid > .row { grid-column: 1 / -1; }
+  .cards-grid > .card { margin-bottom: 0; }
+}

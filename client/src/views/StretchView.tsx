@@ -215,7 +215,7 @@ export default function StretchView() {
   const toggleMute = () => setMuted(m => { const n = !m; localStorage.setItem(MUTE_KEY, n ? '1' : '0'); return n })
 
   return (
-    <div>
+    <div className="view-narrow">
       {focusIndex !== null && (
         <StretchFocus
           stretches={stretches}

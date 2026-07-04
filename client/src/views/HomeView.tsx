@@ -209,7 +209,7 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
   }
 
   return (
-    <div>
+    <div className="home-grid">
       {/* Phase + week */}
       <div className="card">
         <div className="row gap-8 mb-8">
@@ -300,7 +300,7 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
       </div>
 
       {/* Weekly schedule */}
-      <div className="card">
+      <div className="card card-wide">
         <div className="row gap-8 mb-8" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <button
             className="btn btn-secondary btn-sm"

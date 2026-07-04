@@ -120,7 +120,7 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
   }
 
   return (
-    <div>
+    <div className="cards-grid">
       <h2 style={{ display: 'flex', alignItems: 'center' }}>
         Settings
         <SyncBadge status={syncStatus} pending={pendingCount} />
