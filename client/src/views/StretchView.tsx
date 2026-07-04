@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/store'
 import { useEinkMode } from '../store/einkMode'
-import StretchAnimation from '../components/StretchAnimation'
+import YouTubeEmbed from '../components/YouTubeEmbed'
 import { playTimerEnd, preloadTimerSounds } from '../lib/sounds'
 import { dateKey, keyToDate } from '../lib/date'
 import {
@@ -123,19 +123,10 @@ function StretchCard({ stretch, dateStr, audioCtx, muted, focus }: {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-        <StretchAnimation frames={lvl.frames} view={lvl.view} size={focus ? 180 : 130} />
-      </div>
-
       {showVideo ? (
         <div className="mb-8">
-          {lvl.videoUrls.map((u, i) => (
-            <a key={i} className="video-link" href={u} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginRight: 8 }}>▶ Video {lvl.videoUrls.length > 1 ? i + 1 : ''}</a>
-          ))}
-          {priorEntry && (
-            <button className="btn btn-secondary btn-sm" style={{ marginLeft: 8 }} onClick={() => setShowVideo(false)}>Hide video</button>
-          )}
-          {!priorEntry && <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>Watch once, then follow the animation.</span>}
+          <YouTubeEmbed videoId={lvl.videoId} title={`${stretch.name} — ${lvl.name}`} />
+          <button className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} onClick={() => setShowVideo(false)}>Hide video</button>
         </div>
       ) : (
         <button className="btn btn-secondary btn-sm mb-8" onClick={() => setShowVideo(true)}>▶ Watch video</button>
