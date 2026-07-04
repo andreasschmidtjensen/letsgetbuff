@@ -27,6 +27,7 @@ import { WebSocketServer, WebSocket } from 'ws'
 import cookie from 'cookie'
 import type { DatabaseSync } from 'node:sqlite'
 import { config } from './config.js'
+import type { Privilege } from '@letsgetbuff/shared'
 import { liveOrderForSession, setLiveOrderForSession, isParticipant } from './sessions.js'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -35,11 +36,13 @@ export interface AuthedClient extends WebSocket {
   username: string
   userId: number
   sessionId: number
+  level: Privilege
 }
 
 interface JwtPayload {
   sub: number
   username: string
+  level: Privilege
 }
 
 // ── JWT HS256 verification (no external dep) ──────────────────────────────────
@@ -80,7 +83,10 @@ function verifySessionCookie(rawCookies: string | undefined): JwtPayload | null 
   // Check expiry if present
   const exp = payload['exp']
   if (typeof exp === 'number' && Date.now() / 1000 > exp) return null
-  return { sub, username }
+  // Older tokens predate the level claim — treat as 'user' (same as auth.meHandler).
+  const rawLevel = payload['level']
+  const level: Privilege = rawLevel === 'none' || rawLevel === 'viewer' || rawLevel === 'admin' ? rawLevel : 'user'
+  return { sub, username, level }
 }
 
 // ── WebSocket server factory ──────────────────────────────────────────────────
@@ -132,6 +138,13 @@ export function createWsServer(db: DatabaseSync): WebSocketServer {
       try { msg = JSON.parse(raw.toString()) as Record<string, unknown> } catch { return }
 
       if (msg['type'] === 'reorder') {
+        // Read-only invariant: a viewer must never mutate the shared order. Snap
+        // them back to the authoritative current order instead of applying it.
+        if (ws.level === 'viewer') {
+          const live = liveOrderForSession(db, ws.sessionId)
+          if (live) ws.send(JSON.stringify({ type: 'order', order: live.order, version: live.version }))
+          return
+        }
         const order = msg['order'] as string[]
         const basedOnVersion = msg['basedOnVersion'] as number
         if (!Array.isArray(order) || typeof basedOnVersion !== 'number') return

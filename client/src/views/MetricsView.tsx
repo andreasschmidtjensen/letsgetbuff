@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../store/store'
-import { todayKey } from '../lib/date'
+import { todayKey } from '@letsgetbuff/shared'
 
 type MetricKey = 'bodyweightKg' | 'sleepHrs' | 'proteinG'
 

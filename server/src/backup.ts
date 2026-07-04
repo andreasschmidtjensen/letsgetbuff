@@ -4,11 +4,11 @@
  * Backs up to /data/backups/buff-YYYY-MM-DD.db (or alongside BUFF_DB_PATH).
  * Keeps only the most recent MAX_BACKUPS files (default 7).
  *
- * Uses Node's built-in `fs` to copy the database file.
- * For a running WAL-mode database the safest approach is the SQLite
- * `VACUUM INTO` command (node:sqlite) or just a file copy if the db is
- * quiesced — here we do a file copy which is safe for this single-writer,
- * small-scale setup.
+ * The database runs in WAL mode (see db.ts), so a raw `fs.copyFileSync` of the
+ * main .db file can miss transactions still living in the -wal sidecar, yielding
+ * a torn/stale backup. Instead we use SQLite's `VACUUM INTO`, which reads a
+ * consistent snapshot (regardless of WAL state) and writes a single, fully
+ * checkpointed .db file with no -wal/-shm companions to keep together.
  *
  * Restore:
  *   1. Stop the container.
@@ -22,6 +22,7 @@
 
 import fs from 'fs'
 import path from 'path'
+import { DatabaseSync } from 'node:sqlite'
 
 const MAX_BACKUPS = 7
 const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000 // 24 hours
@@ -42,12 +43,27 @@ function doBackup(dbPath: string): void {
   const date = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
   const dest = path.join(dir, `buff-${date}.db`)
 
+  // VACUUM INTO refuses to overwrite an existing file; a second run on the same
+  // day should replace that day's snapshot (matching the old copy behaviour).
   try {
-    fs.copyFileSync(dbPath, dest)
+    if (fs.existsSync(dest)) fs.unlinkSync(dest)
+  } catch (err) {
+    console.error('[backup] could not clear existing snapshot:', err)
+    return
+  }
+
+  // Open a separate connection to snapshot a consistent, checkpointed copy.
+  // VACUUM INTO reads the live db without blocking the main writer.
+  let src: DatabaseSync | null = null
+  try {
+    src = new DatabaseSync(dbPath)
+    src.prepare('VACUUM INTO ?').run(dest)
     console.log('[backup] wrote', dest)
   } catch (err) {
-    console.error('[backup] copy failed:', err)
+    console.error('[backup] VACUUM INTO failed:', err)
     return
+  } finally {
+    try { src?.close() } catch { /* already closed */ }
   }
 
   // Prune old backups — keep only the MAX_BACKUPS most recent

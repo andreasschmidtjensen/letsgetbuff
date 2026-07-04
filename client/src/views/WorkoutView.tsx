@@ -20,13 +20,13 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useStore } from '../store/store'
 import { useTestMode } from '../store/testMode'
-import { useEinkMode } from '../store/einkMode'
 import { useLiveOrder } from '../store/useLiveOrder'
-import { playDoneSound, playTimerEnd, preloadTimerSounds } from '../lib/sounds'
+import { playDoneSound, preloadTimerSounds } from '../lib/sounds'
 import StartSessionModal from '../components/StartSessionModal'
+import CountdownTimer from '../components/CountdownTimer'
 import TestModeBanner from '../components/TestModeBanner'
 import { computeProgramWeek, scheduleFor, todayDayName } from '@letsgetbuff/shared'
-import { todayKey, keyToDate } from '../lib/date'
+import { todayKey, keyToDate } from '@letsgetbuff/shared'
 import { getWorkoutExercises, getWorkout, ExerciseDef } from '@letsgetbuff/shared'
 import { suggestNextWeight, repTargetFor, repBandFor } from '@letsgetbuff/shared'
 import { ExerciseEntry, SetEntry, Session } from '@letsgetbuff/shared'
@@ -79,80 +79,20 @@ interface RestTimerProps {
 }
 
 function RestTimer({ defaultSecs, onDismiss, audioCtx, muted }: RestTimerProps) {
-  const { einkMode } = useEinkMode()
-  const [secs, setSecs] = useState(defaultSecs)
-  const [running, setRunning] = useState(true)
-  const remaining = useRef(defaultSecs)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const fire = useCallback(() => {
-    if (audioCtx && !muted) playTimerEnd(audioCtx)
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-  }, [audioCtx, muted])
-
-  useEffect(() => {
-    if (!running) {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-      return
-    }
-    intervalRef.current = setInterval(() => {
-      remaining.current -= 1
-      setSecs(remaining.current)
-      if (remaining.current <= 0) {
-        clearInterval(intervalRef.current!)
-        setRunning(false)
-        fire()
-      }
-    }, 1000)
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [running, fire])
-
-  const adjust = (delta: number) => {
-    const next = Math.max(5, remaining.current + delta)
-    remaining.current = next
-    setSecs(next)
-  }
-
-  const pct = Math.max(0, secs / defaultSecs)
-  const mins = Math.floor(Math.abs(secs) / 60)
-  const secsPart = Math.abs(secs) % 60
-  const display = `${mins}:${secsPart.toString().padStart(2, '0')}`
-
   return (
-    <div className="rest-timer-overlay" role="dialog" aria-label="Rest timer" aria-live="polite">
-      <div className="rest-timer-card">
-        <div className="rest-timer-label">{secs <= 0 ? 'Rest done!' : 'Rest'}</div>
-        {!einkMode && (
-          <svg viewBox="0 0 80 80" className="rest-timer-ring" aria-hidden="true">
-            <circle cx="40" cy="40" r="34" fill="none" stroke="var(--surface2)" strokeWidth="6"/>
-            <circle
-              cx="40" cy="40" r="34"
-              fill="none"
-              stroke={secs <= 0 ? 'var(--green)' : 'var(--accent)'}
-              strokeWidth="6"
-              strokeDasharray={`${2 * Math.PI * 34}`}
-              strokeDashoffset={`${2 * Math.PI * 34 * (1 - pct)}`}
-              strokeLinecap="round"
-              transform="rotate(-90 40 40)"
-              style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s' }}
-            />
-          </svg>
-        )}
-        <div className="rest-timer-time" aria-label={`${mins} minutes ${secsPart} seconds remaining`}>
-          {display}
-        </div>
-        <div className="rest-timer-adj">
-          <button className="btn btn-secondary btn-sm" onClick={() => adjust(-15)} aria-label="Subtract 15 seconds">-15s</button>
-          <button className="btn btn-secondary btn-sm" onClick={() => { setRunning(r => !r) }} aria-label={running ? 'Pause timer' : 'Resume timer'}>
-            {running ? 'Pause' : 'Resume'}
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => adjust(15)} aria-label="Add 15 seconds">+15s</button>
-        </div>
+    <CountdownTimer
+      seconds={defaultSecs}
+      title="Rest"
+      doneTitle="Rest done!"
+      ariaLabel="Rest timer"
+      audioCtx={audioCtx}
+      muted={muted}
+      renderFooter={(t) => (
         <button className="btn btn-primary" style={{ width: '100%', marginTop: 8 }} onClick={onDismiss}>
-          {secs <= 0 ? 'Next set' : 'Skip rest'}
+          {t.remaining <= 0 ? 'Next set' : 'Skip rest'}
         </button>
-      </div>
-    </div>
+      )}
+    />
   )
 }
 
@@ -169,96 +109,27 @@ interface ExerciseTimerProps {
 // reports the achieved seconds back so the set can be logged. Length is adjustable
 // on the fly (±15s). Completes naturally at 0, or early via "Done".
 function ExerciseTimer({ targetSecs, onComplete, onCancel, audioCtx, onAudioCtxInit, muted }: ExerciseTimerProps) {
-  const { einkMode } = useEinkMode()
-  const [total, setTotal] = useState(targetSecs)
-  const [secs, setSecs] = useState(targetSecs)
-  const [running, setRunning] = useState(true)
-  const remaining = useRef(targetSecs)
-  const totalRef = useRef(targetSecs)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const firedRef = useRef(false)
-
-  const fire = useCallback(() => {
-    if (firedRef.current) return
-    firedRef.current = true
-    if (!muted) { const ctx = audioCtx ?? onAudioCtxInit(); playTimerEnd(ctx) }
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-    onComplete(totalRef.current)
-  }, [audioCtx, muted, onAudioCtxInit, onComplete])
-
-  useEffect(() => {
-    if (!running) {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-      return
-    }
-    intervalRef.current = setInterval(() => {
-      remaining.current -= 1
-      setSecs(remaining.current)
-      if (remaining.current <= 0) {
-        clearInterval(intervalRef.current!)
-        setRunning(false)
-        fire()
-      }
-    }, 1000)
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [running, fire])
-
-  const adjust = (delta: number) => {
-    const nextTotal = Math.max(5, totalRef.current + delta)
-    const nextRemaining = Math.max(1, remaining.current + delta)
-    totalRef.current = nextTotal
-    remaining.current = nextRemaining
-    setTotal(nextTotal)
-    setSecs(nextRemaining)
-  }
-
-  const stopEarly = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current)
-    const achieved = Math.max(1, totalRef.current - Math.max(0, remaining.current))
-    onComplete(achieved)
-  }
-
-  const pct = Math.max(0, secs / total)
-  const mins = Math.floor(Math.abs(secs) / 60)
-  const secsPart = Math.abs(secs) % 60
-  const display = `${mins}:${secsPart.toString().padStart(2, '0')}`
-
   return (
-    <div className="rest-timer-overlay" role="dialog" aria-label="Exercise timer" aria-live="polite">
-      <div className="rest-timer-card exercise-timer-card">
-        <div className="rest-timer-label">{secs <= 0 ? 'Done!' : 'Hold'}</div>
-        {!einkMode && (
-          <svg viewBox="0 0 80 80" className="rest-timer-ring exercise-timer-ring" aria-hidden="true">
-            <circle cx="40" cy="40" r="34" fill="none" stroke="var(--surface2)" strokeWidth="6"/>
-            <circle
-              cx="40" cy="40" r="34"
-              fill="none"
-              stroke={secs <= 0 ? 'var(--green)' : 'var(--accent)'}
-              strokeWidth="6"
-              strokeDasharray={`${2 * Math.PI * 34}`}
-              strokeDashoffset={`${2 * Math.PI * 34 * (1 - pct)}`}
-              strokeLinecap="round"
-              transform="rotate(-90 40 40)"
-              style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s' }}
-            />
-          </svg>
-        )}
-        <div className="rest-timer-time exercise-timer-time" aria-label={`${mins} minutes ${secsPart} seconds remaining`}>
-          {display}
-        </div>
-        <div className="rest-timer-adj">
-          <button className="btn btn-secondary btn-sm" onClick={() => adjust(-15)} aria-label="Subtract 15 seconds">-15s</button>
-          <button className="btn btn-secondary btn-sm" onClick={() => setRunning(r => !r)} aria-label={running ? 'Pause timer' : 'Resume timer'}>
-            {running ? 'Pause' : 'Resume'}
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => adjust(15)} aria-label="Add 15 seconds">+15s</button>
-        </div>
+    <CountdownTimer
+      seconds={targetSecs}
+      title="Hold"
+      doneTitle="Done!"
+      ariaLabel="Exercise timer"
+      adjustAffectsTotal
+      audioCtx={audioCtx}
+      muted={muted}
+      resolveAudioCtx={onAudioCtxInit}
+      onComplete={onComplete}
+      cardClass="exercise-timer-card"
+      ringClass="exercise-timer-ring"
+      timeClass="exercise-timer-time"
+      renderFooter={(t) => (
         <div className="rest-timer-adj" style={{ marginTop: 8 }}>
           <button className="btn btn-secondary" style={{ flex: 1 }} onClick={onCancel} aria-label="Cancel timer">Cancel</button>
-          <button className="btn btn-primary" style={{ flex: 2 }} onClick={stopEarly} aria-label="Log time and finish set">Done</button>
+          <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => { t.stop(); onComplete(t.achieved()) }} aria-label="Log time and finish set">Done</button>
         </div>
-      </div>
-    </div>
+      )}
+    />
   )
 }
 
@@ -1002,9 +873,11 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
   }, [dateStr, workoutType, applySession])
 
   // On opening a gym workout: resume an active session, else prompt (if a partner
-  // exists) or silently create a solo one.
+  // exists) or silently create a solo one. Viewers never participate in sessions
+  // (the server 403s POST /api/session), so they skip resolution entirely and just
+  // observe the plan order read-only.
   useEffect(() => {
-    if (!isGym) {
+    if (!isGym || readOnly) {
       setSessionId(null); setSessionInfo(null); setShowStartModal(false)
       return
     }
@@ -1033,7 +906,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
       .catch(() => { if (!cancelled) createSession('solo') })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateStr, workoutType, isGym, resolveNonce])
+  }, [dateStr, workoutType, isGym, readOnly, resolveNonce])
 
   const endCurrentSession = useCallback(async () => {
     if (sessionId == null) return

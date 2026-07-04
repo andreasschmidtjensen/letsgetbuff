@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../store/store'
 import { useEinkMode } from '../store/einkMode'
 import { computeProgramWeek, phaseFor, scheduleFor, isoWeekKey, weekKeyToMonday, todayDayName, activityLabel, isStretchDay, DayActivity } from '@letsgetbuff/shared'
-import { dateKey, keyToDate, addDays } from '../lib/date'
+import { dateKey, keyToDate, addDays } from '@letsgetbuff/shared'
 import type { Tab, Session } from '@letsgetbuff/shared'
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']

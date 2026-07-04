@@ -102,6 +102,7 @@ function makeWss(db) {
     const cookies = parseCookies(reqObj.headers.cookie)
     const payload = cookies.session ? verifyJwt(cookies.session) : null
     ws.username = payload ? payload.username : 'unknown'
+    ws.level = (payload && payload.level) ? payload.level : 'user'
     ws.sessionId = sessionIdFromUrl(reqObj.url)
 
     const row = getLiveOrder(db, ws.sessionId)
@@ -111,6 +112,13 @@ function makeWss(db) {
       let msg
       try { msg = JSON.parse(raw.toString()) } catch { return }
       if (msg.type !== 'reorder') return
+
+      // Read-only invariant: a viewer never mutates the order — snap them back.
+      if (ws.level === 'viewer') {
+        const live = getLiveOrder(db, ws.sessionId)
+        ws.send(JSON.stringify({ type: 'order', order: JSON.parse(live.exercise_order_json), version: live.version }))
+        return
+      }
 
       const cur = getLiveOrder(db, ws.sessionId)
       if (msg.basedOnVersion !== cur.version) {
@@ -150,9 +158,9 @@ function stopServer({ server, wss }) {
 }
 
 // FIX: Buffer messages from the moment the WebSocket is created.
-function connect(port, username, sessionId = 1) {
+function connect(port, username, sessionId = 1, level = 'user') {
   return new Promise((res, rej) => {
-    const token = makeJwt({ sub: 1, username, exp: Math.floor(Date.now() / 1000) + 3600 })
+    const token = makeJwt({ sub: 1, username, level, exp: Math.floor(Date.now() / 1000) + 3600 })
     const ws = new WebSocket('ws://127.0.0.1:' + port + '/ws?sessionId=' + sessionId, { headers: { cookie: 'session=' + token } })
     ws._queue = []
     ws._waiters = []
@@ -254,6 +262,26 @@ test('4. Reconnect resync: new connection receives current order', async () => {
     assert.equal(init.version, 1)
     assert.deepEqual(init.order, finalOrder)
     ws2.terminate()
+  } finally { await stopServer(ctx) }
+})
+
+test('6. Viewer reorder is rejected: order unchanged, sender snapped back', async () => {
+  const db = makeDb()
+  const ctx = await startServer(db)
+  try {
+    const viewer = await connect(ctx.port, 'val', 1, 'viewer')
+    const init = await nextMsg(viewer)
+    assert.equal(init.version, 0)
+    assert.deepEqual(init.order, PLAN_ORDER)
+
+    // Viewer attempts a reorder with a valid basedOnVersion — must NOT be applied.
+    viewer.send(JSON.stringify({ type: 'reorder', order: ['press', 'squat', 'row', 'deadlift'], basedOnVersion: 0, date: '2026-06-14', workoutType: 'A' }))
+    const snap = await nextMsg(viewer)
+    assert.equal(snap.type, 'order')
+    assert.equal(snap.version, 0)                 // unchanged
+    assert.deepEqual(snap.order, PLAN_ORDER)      // snapped back to plan order
+    assert.equal(getLiveOrder(db, 1).version, 0)  // nothing persisted
+    viewer.terminate()
   } finally { await stopServer(ctx) }
 })
 

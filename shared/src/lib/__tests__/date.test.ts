@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { dateKey, todayKey, keyToDate, addDays } from '../date'
 
 // These tests run under a pinned non-UTC timezone (America/New_York, UTC-4/-5),
-// configured in vite.config.ts. That lets us prove dateKey uses the LOCAL civil
+// configured in vitest.config.ts. That lets us prove dateKey uses the LOCAL civil
 // date rather than the UTC date — the bug that filed late-night logs under the
 // wrong day. Guard against a misconfigured run:
 const RUNNING_NON_UTC = new Date(Date.UTC(2026, 5, 15, 3, 30)).getTimezoneOffset() !== 0

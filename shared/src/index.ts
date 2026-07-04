@@ -1,5 +1,7 @@
 // Shared exports — importable by both client and server
 export * from './types.js'
+export * from './lib/date.js'
+export * from './lib/migrate.js'
 export * from './engine/schedule.js'
 export * from './engine/progression.js'
 export * from './engine/stretchProgression.js'

@@ -49,7 +49,13 @@ export default function MilestonesView() {
         ) : (
           lifts.map(({ exercise, start, current, target }) => {
             if (start === undefined || current === undefined || target === undefined) return null
-            const pct = Math.min(100, Math.round(((current - start) / (target - start)) * 100))
+            // Guard the zero-span case: a starting weight of 0 makes target (start*1.5)
+            // equal start, so target - start = 0 → NaN% width. Treat reaching the
+            // target as complete, otherwise no progress. Also clamp to [0, 100].
+            const span = target - start
+            const pct = span <= 0
+              ? (current >= target ? 100 : 0)
+              : Math.max(0, Math.min(100, Math.round(((current - start) / span) * 100)))
             const done = current >= target
             return (
               <div key={exercise.id} style={{ marginBottom: 14 }}>

@@ -44,7 +44,7 @@ async function start() {
 
   // Live order is now session-scoped — see GET /api/session/:id/live-order (api.ts).
 
-  app.get('/api/health', async () => ({ ok: true, version: 29 }))
+  app.get('/api/health', async () => ({ ok: true, version: 30 }))
 
   if (!config.isDev) {
     const staticDir = path.isAbsolute(config.staticDir)
@@ -76,6 +76,7 @@ async function start() {
       client.username = payload.username
       client.userId = payload.sub
       client.sessionId = sessionId
+      client.level = payload.level
       wss.emit('connection', ws, req)
     })
   })

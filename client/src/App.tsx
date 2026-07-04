@@ -12,6 +12,7 @@ import SettingsView from './views/SettingsView'
 import LoginView from './views/LoginView'
 import HistoryView from './views/HistoryView'
 import TestModeBanner from './components/TestModeBanner'
+import ErrorBoundary from './components/ErrorBoundary'
 import './app.css'
 
 const TABS: { id: Tab; label: string }[] = [
@@ -122,6 +123,14 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
 }
 
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppRoutes />
+    </ErrorBoundary>
+  )
+}
+
+function AppRoutes() {
   const { authState, username, level, onLogin, onLogout } = useAuth()
 
   if (authState === 'checking') {

@@ -21,7 +21,7 @@
  */
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
-import { EMPTY_STATE, SCHEMA_VERSION } from '@letsgetbuff/shared'
+import { EMPTY_STATE, SCHEMA_VERSION, upgrade } from '@letsgetbuff/shared'
 import type { AppState, Plan, Session, ExerciseEntry, ExerciseDef } from '@letsgetbuff/shared'
 import type { Db } from './db.js'
 import { proposeExercise, validateExerciseDef, isAiConfigured, getApiKey, MISSING_KEY_MESSAGE } from './claude.js'
@@ -80,7 +80,11 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       return reply.send({ state: { ...EMPTY_STATE }, updatedAt: null })
     }
     try {
-      const state = JSON.parse(row.json) as AppState
+      // Migrate the stored blob through the shared ladder before serving it — a
+      // pre-v3 server state lacks stretchSessions/stretchSchedule and would crash
+      // views that read them. Same steps the client runs on its cache.
+      const parsed: unknown = JSON.parse(row.json)
+      const state = upgrade(parsed) ?? (parsed as AppState)
       return reply.send({ state, updatedAt: row.updated_at })
     } catch {
       app.log.error(`[api] Corrupt app_state JSON for user ${username}`)
@@ -107,13 +111,15 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
         return reply.code(403).send({ error: 'Viewers cannot modify workout data' })
       }
       const userId = getUserId(db, username)
-      const { state } = req.body
-      if (typeof state !== 'object' || state === null) {
+      const { state: raw } = req.body
+      // Run the incoming blob through the shared ladder and reject anything whose
+      // upgraded shape isn't a plausible AppState — never store an unvalidated
+      // client-claimed blob verbatim. What we persist is always canonical/current.
+      const state = upgrade(raw)
+      if (!state) {
         return reply.code(400).send({ error: 'Invalid state payload' })
       }
       const now = new Date().toISOString()
-      const schemaVersion =
-        typeof state.schemaVersion === 'number' ? state.schemaVersion : SCHEMA_VERSION
       db.prepare(`
         INSERT INTO app_state (user_id, json, schema_version, updated_at)
         VALUES (?, ?, ?, ?)
@@ -121,7 +127,7 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
           json = excluded.json,
           schema_version = excluded.schema_version,
           updated_at = excluded.updated_at
-      `).run(userId, JSON.stringify(state), schemaVersion, now)
+      `).run(userId, JSON.stringify(state), state.schemaVersion ?? SCHEMA_VERSION, now)
       return reply.send({ ok: true, updatedAt: now })
     },
   )
@@ -347,7 +353,11 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
   app.post<{ Body: { scopeDate: string; workout: string; mode?: 'solo' | 'shared'; partnerUsername?: string } }>(
     '/api/session',
     async (req: FastifyRequest<{ Body: { scopeDate: string; workout: string; mode?: 'solo' | 'shared'; partnerUsername?: string } }>, reply: FastifyReply) => {
-      const { username } = authedUser(req)
+      const { username, level } = authedUser(req)
+      // Read-only invariant: viewers may observe but never create/mutate a session.
+      if (level === 'viewer') {
+        return reply.code(403).send({ error: 'Viewers cannot start a session' })
+      }
       const userId = getUserId(db, username)
       const { scopeDate, workout, mode, partnerUsername } = req.body ?? {}
       if (!scopeDate || !workout) {
@@ -380,7 +390,9 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
 
   // GET /api/session/current?scopeDate=&workout= → current active session or { session: null }
   app.get('/api/session/current', async (req: FastifyRequest, reply: FastifyReply) => {
-    const { username } = authedUser(req)
+    const { username, level } = authedUser(req)
+    // Viewers never participate in sessions — report none rather than leaking one.
+    if (level === 'viewer') return reply.send({ session: null })
     const userId = getUserId(db, username)
     const { scopeDate, workout } = req.query as { scopeDate?: string; workout?: string }
     if (!scopeDate || !workout) {
@@ -448,7 +460,8 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
     if (!stateRow) return reply.send({ partnerUsername: partnerRow.username, sessions: {} })
 
     try {
-      const state = JSON.parse(stateRow.json) as AppState
+      const parsed: unknown = JSON.parse(stateRow.json)
+      const state = upgrade(parsed) ?? (parsed as AppState)
       return reply.send({ partnerUsername: partnerRow.username, sessions: state.sessions ?? {} })
     } catch {
       return reply.send({ partnerUsername: partnerRow.username, sessions: {} })
@@ -518,8 +531,10 @@ export function registerApiRoutes(app: FastifyInstance, db: Db): void {
       const stateRow = db
         .prepare('SELECT json FROM app_state WHERE user_id = ?')
         .get(partnerRow.id) as { json: string } | undefined
+      // Migrate the partner's stored blob before merging — writing into an
+      // unmigrated pre-v3 state would persist a shape the client later can't read.
       const partnerState: AppState = stateRow
-        ? (JSON.parse(stateRow.json) as AppState)
+        ? (upgrade(JSON.parse(stateRow.json)) ?? { ...EMPTY_STATE })
         : { ...EMPTY_STATE }
 
       // Merge the exercise entry. Ensure the session row exists.

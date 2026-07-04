@@ -13,7 +13,7 @@ const REST_SECS_OPTIONS = [
 ]
 
 import { exportData, validateImport, putServerState } from '../store/persistence'
-import { todayKey } from '../lib/date'
+import { todayKey } from '@letsgetbuff/shared'
 import { SCHEMA_VERSION } from '@letsgetbuff/shared'
 import type { ExerciseDef, Privilege } from '@letsgetbuff/shared'
 import ConfirmDialog from '../components/ConfirmDialog'

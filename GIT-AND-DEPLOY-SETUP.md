@@ -269,9 +269,11 @@ script — ask me and I'll wire it up.)*
 
 ## Part 8 — Test the auto-deploy
 
-How it works now: on push, GitHub **builds the Docker image**, pushes it to GHCR, then SSHes
-into the server which just runs `git pull` (for the compose file) + `docker compose pull` +
-`up -d`. **Your server never builds** — it only downloads the finished image.
+How it works now: on push, GitHub first runs a **test** job (`npm test`, the full build, and
+lint) — if anything fails, nothing is built or deployed. Only when tests pass does it **build
+the Docker image**, push it to GHCR, then SSH into the server which just runs `git pull` (for
+the compose file) + `docker compose pull` + `up -d`. **Your server never builds** — it only
+downloads the finished image.
 
 It triggers on every push to `main`. Test it now:
 
@@ -282,10 +284,10 @@ git commit -m "Test auto-deploy"
 git push
 ```
 
-Go to your repo → **Actions** tab. You'll see "Build and Deploy" running — first the
-**build** job (builds + pushes the image), then the **deploy** job (SSHes in, `git pull`,
-`docker compose pull`, restart). Green checks = your change is live. You can also re-run it
-manually from that tab (the `workflow_dispatch`).
+Go to your repo → **Actions** tab. You'll see "Build and Deploy" running — first the **test**
+job (tests + build + lint), then the **build** job (builds + pushes the image), then the
+**deploy** job (SSHes in, `git pull`, `docker compose pull`, restart). Green checks = your
+change is live. You can also re-run it manually from that tab (the `workflow_dispatch`).
 
 > Reminder: on the **very first** run the deploy job will fail at `docker compose pull`
 > because the image starts out private — do the one-time Part 7a visibility toggle, then

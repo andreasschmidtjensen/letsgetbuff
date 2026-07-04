@@ -6,8 +6,9 @@
  *  2. PUT upserts state for a user
  *  3. GET retrieves the saved state
  *  4. PUT by a different user does not overwrite the first user's data
- *  5. Server-side migration: PUT state with older schemaVersion still saves (server stores as-is;
- *     the client is responsible for migrating before PUT)
+ *  5. Server-side migration (Phase 20 item 2): every read/write path runs the shared
+ *     migrate/upgrade ladder. PUT upgrades the incoming blob to the current schema and
+ *     rejects unrecognisable shapes; GET migrates a stored older blob before serving it.
  *
  * Uses Node's built-in test runner (node:test) and the same in-memory SQLite + Fastify
  * setup pattern as auth.test.mjs.
@@ -207,6 +208,77 @@ test('GET returns 401 without a session cookie', async (t) => {
   await app.close()
 })
 
+// ── Phase 20 item 2: server-side migration on read/write paths ───────────────
+
+test('PUT upgrades a pre-v3 blob to the current schema before storing', async (t) => {
+  const db = makeDb()
+  const uid = addUser(db, 'mona')
+  const app = await buildServer(db)
+  const token = makeToken(app, uid, 'mona')
+
+  // A v2 blob: no stretchSessions / stretchSchedule (added by the 2->3 migration).
+  const v2 = { schemaVersion: 2, startDate: '2026-01-01', skippedWeeks: [], sessions: {}, metrics: {}, milestones: {} }
+  const putRes = await app.inject({
+    method: 'PUT', url: '/api/state', cookies: { session: token },
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: v2 }),
+  })
+  assert.equal(putRes.statusCode, 200)
+
+  const getRes = await app.inject({ method: 'GET', url: '/api/state', cookies: { session: token } })
+  const state = JSON.parse(getRes.body).state
+  assert.equal(state.schemaVersion, 3)               // upgraded on write
+  assert.deepEqual(state.stretchSessions, {})        // filled by 2->3
+  assert.deepEqual(state.stretchSchedule, { enabled: true })
+
+  await app.close()
+})
+
+test('PUT rejects an unrecognisable payload with 400', async (t) => {
+  const db = makeDb()
+  const uid = addUser(db, 'nils')
+  const app = await buildServer(db)
+  const token = makeToken(app, uid, 'nils')
+
+  // Missing the required sessions/metrics/milestones/skippedWeeks shape.
+  const junk = { schemaVersion: 3, foo: 'bar' }
+  const res = await app.inject({
+    method: 'PUT', url: '/api/state', cookies: { session: token },
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: junk }),
+  })
+  assert.equal(res.statusCode, 400)
+
+  await app.close()
+})
+
+test('GET migrates an older stored blob through the ladder before serving', async (t) => {
+  const db = makeDb()
+  const uid = addUser(db, 'olga')
+  const app = await buildServer(db)
+  const token = makeToken(app, uid, 'olga')
+
+  // Simulate a legacy v1 blob written straight to the DB (no migration on the way in),
+  // including a since-removed exercise id that the 1->2 migration must strip.
+  const legacy = {
+    schemaVersion: 1,
+    startDate: '2026-01-01',
+    skippedWeeks: [],
+    sessions: { '2026-01-02': { workout: 'A', done: true, entries: { 'back-extension': { sets: [] }, 'leg-press': { sets: [] } } } },
+    metrics: {},
+    milestones: {},
+  }
+  db.prepare('INSERT INTO app_state (user_id, json, schema_version, updated_at) VALUES (?, ?, ?, ?)')
+    .run(uid, JSON.stringify(legacy), 1, '2026-01-02T00:00:00Z')
+
+  const res = await app.inject({ method: 'GET', url: '/api/state', cookies: { session: token } })
+  const state = JSON.parse(res.body).state
+  assert.equal(state.schemaVersion, 3)                                        // migrated up the ladder
+  assert.equal(state.sessions['2026-01-02'].entries['back-extension'], undefined) // removed-exercise stripped (1->2)
+  assert.ok(state.sessions['2026-01-02'].entries['leg-press'])                // real entry kept
+  assert.deepEqual(state.stretchSchedule, { enabled: true })                  // 2->3 fields filled
+
+  await app.close()
+})
+
 // ── Phase 11: privilege gating against the real api.ts ───────────────────────
 
 const VIEWER_STATE = { schemaVersion: 2, startDate: '2026-01-01', skippedWeeks: [], sessions: {}, metrics: {}, milestones: {} }
@@ -260,6 +332,29 @@ test('GET /api/admin/users returns 403 for non-admin, lists for admin', async (t
   const body = JSON.parse(ok.body)
   const jacob = body.users.find(u => u.username === 'jacob')
   assert.equal(jacob.level, 'admin')
+
+  await app.close()
+})
+
+test('viewer is blocked from POST /api/session (403); GET current reports none', async (t) => {
+  const db = makeDb()
+  const uid = addUser(db, 'vera', 'viewer')
+  const app = await buildServer(db)
+  const token = makeToken(app, uid, 'vera', 'viewer')
+
+  const create = await app.inject({
+    method: 'POST', url: '/api/session', cookies: { session: token },
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ scopeDate: '2026-07-04', workout: 'A' }),
+  })
+  assert.equal(create.statusCode, 403)
+
+  const current = await app.inject({
+    method: 'GET', url: '/api/session/current?scopeDate=2026-07-04&workout=A',
+    cookies: { session: token },
+  })
+  assert.equal(current.statusCode, 200)
+  assert.equal(JSON.parse(current.body).session, null)
 
   await app.close()
 })

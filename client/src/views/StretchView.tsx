@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/store'
 import { useEinkMode } from '../store/einkMode'
 import YouTubeEmbed from '../components/YouTubeEmbed'
-import { playTimerEnd, preloadTimerSounds } from '../lib/sounds'
-import { dateKey, keyToDate } from '../lib/date'
+import { useCountdown } from '../components/CountdownTimer'
+import { preloadTimerSounds } from '../lib/sounds'
+import { dateKey, keyToDate } from '@letsgetbuff/shared'
 import {
   computeProgramWeek, isStretchDay, todayDayName,
   getSessionStretches, getStretchLevel, suggestStretchLevel,
@@ -29,34 +30,17 @@ function StretchTimer({ seconds, label, onComplete, audioCtx, muted }: {
   seconds: number; label: string; onComplete: () => void
   audioCtx: AudioContext | null; muted: boolean
 }) {
-  const [remaining, setRemaining] = useState(seconds)
-  const [running, setRunning] = useState(false)
-  const ref = useRef(seconds)
-
-  useEffect(() => {
-    if (!running) return
-    const id = setInterval(() => {
-      ref.current -= 1
-      setRemaining(ref.current)
-      if (ref.current <= 0) {
-        clearInterval(id)
-        setRunning(false)
-        if (audioCtx && !muted) playTimerEnd(audioCtx)
-        if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-        onComplete()
-      }
-    }, 1000)
-    return () => clearInterval(id)
-  }, [running]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const start = () => { ref.current = seconds; setRemaining(seconds); setRunning(true) }
+  // Shared countdown engine (audio ding + vibrate on reaching zero). This inline
+  // timer has no ring or ±adjust, so it uses the hook directly rather than the
+  // <CountdownTimer> overlay.
+  const timer = useCountdown({ seconds, audioCtx, muted, onComplete: () => onComplete() })
 
   return (
     <div className="row gap-8" style={{ alignItems: 'center' }}>
-      {running ? (
-        <span style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmt(remaining)}</span>
+      {timer.running ? (
+        <span style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmt(timer.remaining)}</span>
       ) : (
-        <button className="btn btn-primary btn-sm" onClick={start} aria-label={`Start ${label} timer`}>
+        <button className="btn btn-primary btn-sm" onClick={timer.start} aria-label={`Start ${label} timer`}>
           ▶ {label} {fmt(seconds)}
         </button>
       )}
