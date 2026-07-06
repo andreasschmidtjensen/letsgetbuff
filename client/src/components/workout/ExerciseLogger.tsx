@@ -7,7 +7,8 @@ import { useTestMode } from '../../store/testMode'
 import { playDoneSound } from '../../lib/sounds'
 import { suggestNextWeight, repTargetFor } from '@letsgetbuff/shared'
 import type { ExerciseDef, ExerciseEntry, SetEntry, Session } from '@letsgetbuff/shared'
-import { RestTimer, ExerciseTimer, VideoCarousel } from './timers'
+import { RestTimer, ExerciseTimer, VideoCarousel, VideoPanel } from './timers'
+import { parseYouTubeUrl } from '../../lib/youtube'
 import { lastSessionBefore, formatSet, deltaLabel, formatDuration } from './helpers'
 
 function DragHandle({ listeners, attributes }: {
@@ -116,6 +117,11 @@ export function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, a
   const [editing, setEditing] = useState<number | null>(null)
   const [feltEasy, setFeltEasy] = useState(existing?.feltEasy ?? false)
   const [expanded, setExpanded] = useState(focus ?? false)
+  // Embedded video (Phase 21): focus mode shows the self card's video by
+  // default (like stretch cards); the list and the partner proxy card start
+  // collapsed so the workout list stays scannable.
+  const hasEmbeddable = exercise.videoUrls.some(u => parseYouTubeUrl(u) !== null)
+  const [showVideo, setShowVideo] = useState(Boolean(focus) && !proxyFor && hasEmbeddable)
   const [showTimer, setShowTimer] = useState(false)
   const [timingSet, setTimingSet] = useState<number | null>(null)
   const restDefault = restDefaultSecs
@@ -234,11 +240,28 @@ export function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, a
           }
           <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>{expanded ? '▲' : '▼'}</span>
         </button>
-        <VideoCarousel urls={exercise.videoUrls} />
+        {hasEmbeddable ? (
+          <button
+            className="video-toggle"
+            onClick={() => setShowVideo(v => !v)}
+            aria-expanded={showVideo}
+            aria-controls={`ex-video-${exercise.id}`}
+          >
+            {showVideo ? 'Hide video' : '▶ Video'}
+          </button>
+        ) : (
+          <VideoCarousel urls={exercise.videoUrls} />
+        )}
         {onStartFocus && (
           <button className="btn btn-sm btn-secondary" onClick={onStartFocus} aria-label={`Focus on ${exercise.name}`}>⊞</button>
         )}
       </div>
+
+      {showVideo && hasEmbeddable && (
+        <div id={`ex-video-${exercise.id}`} className="mb-8">
+          <VideoPanel urls={exercise.videoUrls} title={exercise.name} />
+        </div>
+      )}
 
       {exercise.safetyCues.length > 0 && expanded && (
         <div className="safety-banner" style={{ marginBottom: 8 }} role="note">

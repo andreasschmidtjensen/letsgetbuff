@@ -109,7 +109,7 @@ function StretchCard({ stretch, dateStr, audioCtx, muted, focus }: {
 
       {showVideo ? (
         <div className="mb-8">
-          <YouTubeEmbed videoId={lvl.videoId} title={`${stretch.name} — ${lvl.name}`} />
+          <YouTubeEmbed videoId={lvl.videoId} vertical={lvl.vertical} title={`${stretch.name} — ${lvl.name}`} />
           <button className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} onClick={() => setShowVideo(false)}>Hide video</button>
         </div>
       ) : (

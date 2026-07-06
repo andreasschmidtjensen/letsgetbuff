@@ -64,3 +64,22 @@ test('a broken thumbnail degrades to a cues note + plain YouTube link', () => {
   expect(link.getAttribute('href')).toBe('https://www.youtube.com/watch?v=LHesB7TJW6c')
   expect(container!.textContent).toContain('follow the written cues')
 })
+
+test('vertical renders a 9:16 box with the portrait Shorts thumbnail', () => {
+  render(<YouTubeEmbed videoId="Rkkc-FnURyc" title="Lunge demo" vertical />)
+  const btn = container!.querySelector('button')!
+  expect(btn.style.aspectRatio).toBe('9 / 16')
+  const img = container!.querySelector('img')!
+  expect(img.getAttribute('src')).toBe('https://i.ytimg.com/vi/Rkkc-FnURyc/oar2.jpg')
+})
+
+test('vertical thumbnail falls back oar2 → hqdefault → broken', () => {
+  render(<YouTubeEmbed videoId="Rkkc-FnURyc" title="Lunge demo" vertical />)
+  let img = container!.querySelector('img')!
+  act(() => { img.dispatchEvent(new Event('error', { bubbles: true })) })
+  img = container!.querySelector('img')!
+  expect(img.getAttribute('src')).toBe('https://i.ytimg.com/vi/Rkkc-FnURyc/hqdefault.jpg')
+  act(() => { img.dispatchEvent(new Event('error', { bubbles: true })) })
+  expect(container!.querySelector('img')).toBeNull()
+  expect(container!.textContent).toContain('follow the written cues')
+})

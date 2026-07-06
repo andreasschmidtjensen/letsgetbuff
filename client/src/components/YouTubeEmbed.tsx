@@ -4,12 +4,19 @@ import { useState } from 'react'
 // (heavy, cookie-setting) iframe once the user actually plays. Uses
 // youtube-nocookie.com so no tracking cookie is set unless played. If the
 // thumbnail 404s (removed/private video) we degrade to the written cues that
-// StretchCard already renders below the embed, plus a plain link.
-export default function YouTubeEmbed({ videoId, title }: { videoId: string; title: string }) {
+// the card already renders below the embed, plus a plain link.
+//
+// `vertical` renders a 9:16 box (Shorts) capped at 240px wide so it doesn't
+// fill the whole phone screen. Shorts get the portrait oar2.jpg thumbnail
+// first; if that's missing we retry the universal hqdefault.jpg before giving
+// up on the video entirely.
+export default function YouTubeEmbed({ videoId, title, vertical }: { videoId: string; title: string; vertical?: boolean }) {
   const [playing, setPlaying] = useState(false)
-  const [broken, setBroken] = useState(false)
+  // 0 = preferred thumb, 1 = fallback thumb (vertical only), 2 = broken
+  const [thumbStep, setThumbStep] = useState(0)
 
   const watchUrl = `https://www.youtube.com/watch?v=${videoId}`
+  const broken = thumbStep >= 2
 
   if (broken) {
     return (
@@ -20,11 +27,17 @@ export default function YouTubeEmbed({ videoId, title }: { videoId: string; titl
     )
   }
 
-  const box: React.CSSProperties = {
-    position: 'relative', width: '100%', aspectRatio: '16 / 9',
-    borderRadius: 8, overflow: 'hidden', background: 'var(--surface)',
-    border: '1px solid var(--border)',
-  }
+  const box: React.CSSProperties = vertical
+    ? {
+        position: 'relative', width: 'min(100%, 240px)', aspectRatio: '9 / 16',
+        margin: '0 auto', borderRadius: 8, overflow: 'hidden',
+        background: 'var(--surface)', border: '1px solid var(--border)',
+      }
+    : {
+        position: 'relative', width: '100%', aspectRatio: '16 / 9',
+        borderRadius: 8, overflow: 'hidden', background: 'var(--surface)',
+        border: '1px solid var(--border)',
+      }
 
   if (playing) {
     return (
@@ -41,6 +54,10 @@ export default function YouTubeEmbed({ videoId, title }: { videoId: string; titl
     )
   }
 
+  const thumbSrc = vertical && thumbStep === 0
+    ? `https://i.ytimg.com/vi/${videoId}/oar2.jpg`
+    : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+
   return (
     <button
       type="button"
@@ -49,10 +66,10 @@ export default function YouTubeEmbed({ videoId, title }: { videoId: string; titl
       style={{ ...box, padding: 0, cursor: 'pointer', display: 'block' }}
     >
       <img
-        src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
+        src={thumbSrc}
         alt=""
         loading="lazy"
-        onError={() => setBroken(true)}
+        onError={() => setThumbStep(s => (vertical ? s + 1 : 2))}
         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
       />
       <span

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import CountdownTimer from '../CountdownTimer'
+import YouTubeEmbed from '../YouTubeEmbed'
+import { parseYouTubeUrl } from '../../lib/youtube'
 import { formatDuration } from './helpers'
 
 // Small presentational pieces of the workout floor. RestTimer/ExerciseTimer are
@@ -156,6 +158,56 @@ export function VideoCarousel({ urls }: { urls: string[] }) {
         ))}
       </div>
       <button className="vc-arrow" aria-label="Next video" onClick={() => go(1)}>›</button>
+    </div>
+  )
+}
+
+// Embedded-video panel (Phase 21): the gym-exercise counterpart of the stretch
+// embed. Renders the selected URL as a lite YouTube embed; URLs the parser
+// can't handle (non-YouTube from AI discovery) keep the external-link
+// behaviour for that slot. Navigation lives BELOW the embed because a playing
+// iframe swallows touch events — dots/arrows are the reliable controls, with
+// swipe supported on the nav strip itself.
+export function VideoPanel({ urls, title }: { urls: string[]; title: string }) {
+  const [i, setI] = useState(0)
+  const touchX = useRef<number | null>(null)
+  if (urls.length === 0) return null
+  const n = urls.length
+  const parsed = parseYouTubeUrl(urls[i])
+  const go = (delta: number) => setI(prev => (prev + delta + n) % n)
+  return (
+    <div>
+      {parsed ? (
+        <YouTubeEmbed
+          key={i}
+          videoId={parsed.videoId}
+          vertical={parsed.vertical}
+          title={n > 1 ? `${title} — video ${i + 1} of ${n}` : title}
+        />
+      ) : (
+        <a className="video-link" href={urls[i]} target="_blank" rel="noopener noreferrer">Open video ↗</a>
+      )}
+      {n > 1 && (
+        <div className="video-panel-nav"
+          onTouchStart={e => { touchX.current = e.touches[0].clientX }}
+          onTouchEnd={e => {
+            if (touchX.current === null) return
+            const dx = e.changedTouches[0].clientX - touchX.current
+            if (Math.abs(dx) > 30) go(dx < 0 ? 1 : -1)
+            touchX.current = null
+          }}>
+          <button className="vc-arrow" aria-label="Previous video" onClick={() => go(-1)}>‹</button>
+          <div className="vc-dots">
+            {urls.map((_, idx) => (
+              <button key={idx} className={`vc-dot${idx === i ? ' active' : ''}`}
+                aria-label={`Video ${idx + 1}`} aria-current={idx === i} onClick={() => setI(idx)}>
+                {idx + 1}
+              </button>
+            ))}
+          </div>
+          <button className="vc-arrow" aria-label="Next video" onClick={() => go(1)}>›</button>
+        </div>
+      )}
     </div>
   )
 }

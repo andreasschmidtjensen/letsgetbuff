@@ -8,8 +8,8 @@ describe('stretch catalog integrity', () => {
     expect(all.length).toBeGreaterThanOrEqual(16)
   })
 
-  it('plan version is 2 (videoId model)', () => {
-    expect(DEFAULT_STRETCH_PLAN.version).toBe(2)
+  it('plan version is 3 (videoId + vertical model)', () => {
+    expect(DEFAULT_STRETCH_PLAN.version).toBe(3)
   })
 
   it('every stretch has 3 ascending levels', () => {
