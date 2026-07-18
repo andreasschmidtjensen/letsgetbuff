@@ -25,8 +25,6 @@
 
 import { IncomingMessage } from 'node:http'
 import { WebSocketServer, WebSocket } from 'ws'
-// Named import — the CI-installed `cookie` build exposes no default export.
-import { parse as parseCookies } from 'cookie'
 import type { DatabaseSync } from 'node:sqlite'
 import type { Privilege } from '@letsgetbuff/shared'
 import { liveOrderForSession, setLiveOrderForSession, isParticipant } from './sessions.js'
@@ -142,13 +140,26 @@ export function createWsServer(db: DatabaseSync): WebSocketServer {
 /** Verifies a session token and returns its claims; throws if invalid/expired. */
 export type TokenVerifier = (token: string) => unknown
 
+// Minimal Cookie-header lookup — the `cookie` package's type shape differs
+// between local and CI installs, and we only ever read this one cookie.
+function sessionTokenFrom(rawCookies: string | undefined): string | undefined {
+  if (!rawCookies) return undefined
+  for (const part of rawCookies.split(';')) {
+    const eq = part.indexOf('=')
+    if (eq === -1) continue
+    if (part.slice(0, eq).trim() === 'session') {
+      try { return decodeURIComponent(part.slice(eq + 1).trim()) } catch { return part.slice(eq + 1).trim() }
+    }
+  }
+  return undefined
+}
+
 export function authenticateUpgrade(
   req: IncomingMessage,
   verify: TokenVerifier,
   reject: (statusCode: number, message: string) => void,
 ): JwtPayload | null {
-  const raw = req.headers.cookie
-  const token = raw ? parseCookies(raw)['session'] : undefined
+  const token = sessionTokenFrom(req.headers.cookie)
   if (!token) { reject(401, 'Unauthorized'); return null }
   let payload: Record<string, unknown>
   try {
