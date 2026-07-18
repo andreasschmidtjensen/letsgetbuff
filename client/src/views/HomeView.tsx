@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useStore } from '../store/store'
 import { useEinkMode } from '../store/einkMode'
-import { computeProgramWeek, phaseFor, scheduleFor, isoWeekKey, weekKeyToMonday, todayDayName, activityLabel, isStretchDay, DayActivity } from '@letsgetbuff/shared'
+import { computeProgramWeek, phaseFor, scheduleFor, isoWeekKey, weekKeyToMonday, todayDayName, activityLabel, DayActivity } from '@letsgetbuff/shared'
 import { dateKey, keyToDate, addDays } from '@letsgetbuff/shared'
-import type { Tab, Session } from '@letsgetbuff/shared'
+import type { Tab, Session, ActivityEntry, ActivityType } from '@letsgetbuff/shared'
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
@@ -59,6 +59,72 @@ function sessionActivity(w: Session['workout']): DayActivity {
   }
 }
 
+function activityEntryLabel(a: ActivityEntry): string {
+  const name = a.type === 'run' ? 'Run' : a.type === 'bike' ? 'Bike' : 'Stretch'
+  return a.minutes ? `${name} ${a.minutes} min` : name
+}
+
+// "+ Add activity" — the calendar plan only prescribes gym days; runs, rides and
+// stretch sessions are added here. Stretch routes to the Stretch tab (its own log).
+function AddActivity({ date, onNavigate }: { date: string; onNavigate: (tab: Tab) => void }) {
+  const { dispatch } = useStore()
+  const [open, setOpen] = useState(false)
+  const [type, setType] = useState<ActivityType>('run')
+  const [minutes, setMinutes] = useState(30)
+
+  if (!open) {
+    return (
+      <button className="btn btn-secondary btn-sm" onClick={() => setOpen(true)}>
+        + Add activity
+      </button>
+    )
+  }
+  return (
+    <div className="row gap-8" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+      <select
+        className="input"
+        style={{ width: 'auto' }}
+        value={type}
+        aria-label="Activity type"
+        onChange={e => setType(e.target.value as ActivityType)}
+      >
+        <option value="run">Run</option>
+        <option value="bike">Bike</option>
+        <option value="stretch">Stretch program</option>
+      </select>
+      {type !== 'stretch' && (
+        <label className="row gap-4" style={{ alignItems: 'center', fontSize: 13 }}>
+          <input
+            type="number"
+            className="input"
+            style={{ width: 64 }}
+            min={5}
+            step={5}
+            value={minutes}
+            aria-label="Length in minutes"
+            onChange={e => setMinutes(Math.max(1, Number(e.target.value) || 0))}
+          />
+          min
+        </label>
+      )}
+      <button
+        className="btn btn-primary btn-sm"
+        onClick={() => {
+          if (type === 'stretch') {
+            onNavigate('stretch')
+          } else {
+            dispatch({ type: 'ADD_ACTIVITY', date, activity: { type, minutes } })
+          }
+          setOpen(false)
+        }}
+      >
+        {type === 'stretch' ? 'Open stretch →' : 'Add'}
+      </button>
+      <button className="btn btn-secondary btn-sm" onClick={() => setOpen(false)}>Cancel</button>
+    </div>
+  )
+}
+
 export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const { state, dispatch } = useStore()
   const { einkMode } = useEinkMode()
@@ -104,8 +170,8 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
   const todaySession = state.sessions[todayStr]
   // What to display for "Today": the logged workout if one exists, else the scheduled activity
   const todayDisplayActivity = todaySession ? sessionActivity(todaySession.workout) : todayActivity
-  const stretchTodayEnabled = isStretchDay(programWeek, todayDay, state.stretchSchedule.enabled)
   const stretchDoneToday = Boolean(state.stretchSessions[todayStr]?.done)
+  const todayActivities = state.activities[todayStr] ?? []
 
   const nextGym = nextGymSession(state.startDate, state.skippedWeeks, state.sessions, today)
 
@@ -140,11 +206,6 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
               Open Workout {todayActivity === 'gym-a' ? 'A' : 'B'}
             </button>
           )}
-          {(todayActivity === 'bike' || todayActivity === 'run') && !todaySession?.done && (
-            <button className="btn btn-secondary w-full" onClick={() => dispatch({ type: 'MARK_DAY_DONE', date: todayStr, workout: todayActivity })}>
-              Mark {activityLabel(todayActivity)} done
-            </button>
-          )}
           {todayActivity === 'rest' && !todaySession?.done && (
             <button className="btn btn-secondary w-full" onClick={() => dispatch({ type: 'MARK_DAY_DONE', date: todayStr, workout: 'rest' })}>
               Mark rest day
@@ -155,11 +216,25 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
               Undo
             </button>
           )}
-          {stretchTodayEnabled && (
-            <button className="btn btn-secondary w-full mt-8" onClick={() => onNavigate('stretch')}>
-              Stretch (optional){stretchDoneToday ? ' ✓' : ''}
-            </button>
-          )}
+          {todayActivities.map((a, i) => (
+            <div key={i} className="row gap-8" style={{ alignItems: 'center', marginTop: 8, fontSize: 15 }}>
+              <span>{activityEntryLabel(a)} ✓</span>
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ marginLeft: 'auto' }}
+                aria-label={`Remove ${activityEntryLabel(a)}`}
+                onClick={() => dispatch({ type: 'REMOVE_ACTIVITY', date: todayStr, index: i })}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <div className="mt-8">
+            <AddActivity date={todayStr} onNavigate={onNavigate} />
+          </div>
+          <button className="btn btn-secondary w-full mt-8" onClick={() => onNavigate('stretch')}>
+            Stretch (optional){stretchDoneToday ? ' ✓' : ''}
+          </button>
         </div>
 
         {nextGym && nextGym.dateKey !== todayStr && (
@@ -179,6 +254,8 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
             const sess = state.sessions[cellKey]
             const act = sess ? sessionActivity(sess.workout) : schedule[dk]
             const isToday = cellKey === todayStr
+            const extras = (state.activities[cellKey] ?? []).map(activityEntryLabel)
+            if (state.stretchSessions[cellKey]?.done) extras.push('Stretch')
             return (
               <div
                 key={dk}
@@ -190,7 +267,10 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
                 }}
               >
                 <span>{DAY_LABELS[i]}{isToday ? ' (today)' : ''}</span>
-                <span>{activityLabel(act)}{sess?.done ? ' ✓' : ''}</span>
+                <span>
+                  {activityLabel(act)}{sess?.done ? ' ✓' : ''}
+                  {extras.length > 0 ? ` · ${extras.join(' · ')} ✓` : ''}
+                </span>
               </div>
             )
           })}
@@ -264,14 +344,6 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
             Log Workout B
           </button>
         )}
-        {(todayActivity === 'bike' || todayActivity === 'run') && !todaySession?.done && (
-          <button
-            className="btn btn-secondary"
-            onClick={() => dispatch({ type: 'MARK_DAY_DONE', date: todayStr, workout: todayActivity })}
-          >
-            Mark {activityLabel(todayActivity)} done
-          </button>
-        )}
         {todayActivity === 'rest' && !todaySession?.done && (
           <button
             className="btn btn-secondary"
@@ -288,15 +360,34 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
             Undo
           </button>
         )}
-        {stretchTodayEnabled && (
-          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-            <div className="row gap-8" style={{ alignItems: 'center' }}>
-              <span style={{ fontSize: 14, color: 'var(--green)' }}>Stretch (optional)</span>
-              {stretchDoneToday && <span className="badge badge-green">Done</span>}
-              <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => onNavigate('stretch')}>Open &rarr;</button>
-            </div>
+        {todayActivities.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            {todayActivities.map((a, i) => (
+              <div key={i} className="row gap-8" style={{ alignItems: 'center', fontSize: 14, marginBottom: 4 }}>
+                <span style={{ color: 'var(--green)' }}>{activityEntryLabel(a)}</span>
+                <span className="badge badge-green">Done</span>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ marginLeft: 'auto' }}
+                  aria-label={`Remove ${activityEntryLabel(a)}`}
+                  onClick={() => dispatch({ type: 'REMOVE_ACTIVITY', date: todayStr, index: i })}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
         )}
+        <div style={{ marginTop: 10 }}>
+          <AddActivity date={todayStr} onNavigate={onNavigate} />
+        </div>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          <div className="row gap-8" style={{ alignItems: 'center' }}>
+            <span style={{ fontSize: 14, color: 'var(--green)' }}>Stretch (optional)</span>
+            {stretchDoneToday && <span className="badge badge-green">Done</span>}
+            <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => onNavigate('stretch')}>Open &rarr;</button>
+          </div>
+        </div>
       </div>
 
       {/* Weekly schedule */}
@@ -332,9 +423,14 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
                 <span className="day-name">{DAY_LABELS[i]}</span>
                 <span className="day-act" style={{ color: activityColor(act) }}>{activityBadge(act)}</span>
                 {sess?.done && <span className="day-done">✓</span>}
-                {isStretchDay(viewProgramWeek, dk, state.stretchSchedule.enabled) && (
-                  <span title="Stretch day" style={{ color: 'var(--green)', fontSize: 10, marginTop: 2 }}>
-                    {state.stretchSessions[cellKey]?.done ? 'str ✓' : 'str'}
+                {(state.activities[cellKey] ?? []).map((a, ai) => (
+                  <span key={ai} title={activityEntryLabel(a)} style={{ color: 'var(--green)', fontSize: 10, marginTop: 2 }}>
+                    {a.type}{a.minutes ? ` ${a.minutes}′` : ''} ✓
+                  </span>
+                ))}
+                {state.stretchSessions[cellKey]?.done && (
+                  <span title="Stretching done" style={{ color: 'var(--green)', fontSize: 10, marginTop: 2 }}>
+                    str ✓
                   </span>
                 )}
               </div>

@@ -29,6 +29,22 @@ describe('suggestNextWeight', () => {
     expect(suggestNextWeight('rdl', 60, true)).toBe(62.5)
   })
 
+  it('deloads ~10% (rounded to the increment) after a 14+ day gap', () => {
+    expect(suggestNextWeight('dumbbell', 20, true, 14)).toBe(18)
+    expect(suggestNextWeight('legPress', 100, false, 21)).toBe(90)
+    expect(suggestNextWeight('cable', 30, true, 30)).toBe(27.5)
+  })
+
+  it('gap deload ignores feltEasy and never exceeds the old weight', () => {
+    expect(suggestNextWeight('dumbbell', 3, true, 60)).toBe(3) // rounds to 3, capped at last
+    expect(suggestNextWeight('dumbbell', 1, false, 60)).toBe(1) // floor at one increment
+  })
+
+  it('gaps under 14 days progress normally', () => {
+    expect(suggestNextWeight('dumbbell', 20, true, 13)).toBe(21)
+    expect(suggestNextWeight('dumbbell', 20, false, 13)).toBe(20)
+  })
+
   it('suggests +2.5 for cable after easy session', () => {
     expect(suggestNextWeight('cable', 30, true)).toBe(32.5)
   })
@@ -125,9 +141,9 @@ describe('Workout B catalog (v2-2)', () => {
     expect(ids).not.toContain('bird-dog')
   })
 
-  it('contains the v2-2 exercise list in order', () => {
+  it('contains the expected exercise list in order', () => {
     const ids = workoutB.exercises.map(e => e.id)
-    expect(ids).toEqual(['leg-press', 'single-arm-row', 'lat-pulldown', 'dumbbell-curl', 'overhead-tricep-extension', 'pallof-press', 'face-pull'])
+    expect(ids).toEqual(['leg-press', 'single-arm-row', 'lat-pulldown', 'dumbbell-curl', 'overhead-tricep-extension', 'pallof-press', 'face-pull', 'standing-calf-raise'])
   })
 
   it('getExercise returns undefined for retired ids', () => {

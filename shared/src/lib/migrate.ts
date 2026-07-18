@@ -31,6 +31,12 @@ const MIGRATIONS: Record<number, Migration> = {
     stretchSessions: (state.stretchSessions ?? {}),
     stretchSchedule: (state.stretchSchedule ?? { enabled: true }),
   }),
+  // 3 -> 4: user-added activities (run/bike/stretch per date). Purely additive;
+  // stretchSchedule stays in the shape so old backups round-trip untouched.
+  3: (state) => ({
+    ...state,
+    activities: (state.activities ?? {}),
+  }),
 }
 
 // Run the migration ladder from `fromVersion` up to SCHEMA_VERSION.

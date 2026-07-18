@@ -8,6 +8,7 @@ import {
   loadLocalState, saveLocalState,
   fetchServerState, putServerState,
   isMigrated, markMigrated,
+  flushProxyQueue,
 } from './persistence'
 import { useTestMode } from './testMode'
 
@@ -119,6 +120,8 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
     loadFromServer()
     // Load server plan in parallel — no need to block state restore on this
     loadServerPlan()
+    // Send any proxy-log entries queued while offline in a previous visit
+    if (!testModeRef.current) flushProxyQueue().catch(() => {})
     return () => { cancelled = true }
   }, [username])
 
@@ -159,6 +162,10 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
   // ── 3. Flush on reconnect / periodic retry ────────────────────────────────
   useEffect(() => {
     async function retry() {
+      // Queued proxy-log entries (sets logged for the partner) retry on the
+      // same cadence — they live outside AppState, so pendingCount doesn't
+      // cover them.
+      if (!testModeRef.current) flushProxyQueue().catch(() => {})
       if (pendingCount === 0) return
       if (testModeRef.current) return  // never push sandbox edits
       setSyncStatus('syncing')

@@ -1,4 +1,4 @@
-import { AppState, Session, DayMetric, ExerciseEntry, SetEntry, StretchEntry, StretchSession } from '@letsgetbuff/shared'
+import { ActivityEntry, AppState, Session, DayMetric, ExerciseEntry, SetEntry, StretchEntry, StretchSession } from '@letsgetbuff/shared'
 
 export type Action =
   | { type: 'SET_START_DATE'; date: string }
@@ -14,6 +14,8 @@ export type Action =
   | { type: 'MARK_STRETCH_DONE'; date: string; sessionId: string }
   | { type: 'UNMARK_STRETCH_DONE'; date: string }
   | { type: 'SET_STRETCH_SCHEDULE'; enabled: boolean }
+  | { type: 'ADD_ACTIVITY'; date: string; activity: ActivityEntry }
+  | { type: 'REMOVE_ACTIVITY'; date: string; index: number }
   | { type: 'REPLACE_STATE'; state: AppState }
 
 export function reducer(state: AppState, action: Action): AppState {
@@ -141,6 +143,24 @@ export function reducer(state: AppState, action: Action): AppState {
 
     case 'SET_STRETCH_SCHEDULE':
       return { ...state, stretchSchedule: { enabled: action.enabled } }
+
+    case 'ADD_ACTIVITY': {
+      const existing = state.activities[action.date] ?? []
+      return {
+        ...state,
+        activities: { ...state.activities, [action.date]: [...existing, action.activity] },
+      }
+    }
+
+    case 'REMOVE_ACTIVITY': {
+      const existing = state.activities[action.date]
+      if (!existing || action.index < 0 || action.index >= existing.length) return state
+      const next = existing.filter((_, i) => i !== action.index)
+      const activities = { ...state.activities }
+      if (next.length === 0) delete activities[action.date]
+      else activities[action.date] = next
+      return { ...state, activities }
+    }
 
     case 'REPLACE_STATE':
       return action.state

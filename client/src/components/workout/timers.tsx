@@ -85,7 +85,7 @@ export function ExerciseTimer({ targetSecs, onComplete, onCancel, audioCtx, onAu
 }
 
 interface WarmupCardProps {
-  warmup: { label: string; seconds: number }
+  warmup: { label: string; seconds: number; videoId?: string; vertical?: boolean }
   done: boolean
   onDone: () => void
   audioCtx: AudioContext | null
@@ -114,6 +114,11 @@ export function WarmupCard({ warmup, done, onDone, audioCtx, onAudioCtxInit, mut
         {done && <span className="badge badge-green" style={{ marginLeft: 'auto' }}>done</span>}
       </div>
       <p className="muted" style={{ fontSize: 15, marginBottom: 12 }}>{warmup.label}</p>
+      {warmup.videoId && (
+        <div className="mb-8">
+          <YouTubeEmbed videoId={warmup.videoId} vertical={warmup.vertical} title={`${warmup.label} — form`} />
+        </div>
+      )}
       <div className="set-inputs" role="group" aria-label="Warm-up timer">
         <button
           className="btn btn-primary btn-start-timer"

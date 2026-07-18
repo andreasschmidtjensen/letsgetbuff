@@ -6,7 +6,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { config } from './config.js'
 import { openDb } from './db.js'
-import { loginHandler, logoutHandler, meHandler, authGuard, closeCwaDb } from './auth.js'
+import { loginHandler, logoutHandler, meHandler, authGuard, liveLevel, closeCwaDb } from './auth.js'
 import { registerApiRoutes } from './api.js'
 import { createWsServer, authenticateUpgrade, AuthedClient } from './ws.js'
 import { startBackupScheduler } from './backup.js'
@@ -30,6 +30,9 @@ async function start() {
     cookie: { cookieName: 'session', signed: false },
   })
 
+  // authGuard reads this to refresh the caller's privilege from the DB on
+  // every request (JWT level is only a fallback).
+  app.decorate('buffDb', db)
   app.addHook('preHandler', authGuard.bind(app))
 
   app.post<{ Body: { username: string; password: string } }>(
@@ -44,7 +47,7 @@ async function start() {
 
   // Live order is now session-scoped — see GET /api/session/:id/live-order (api.ts).
 
-  app.get('/api/health', async () => ({ ok: true, version: 32 }))
+  app.get('/api/health', async () => ({ ok: true, version: 33 }))
 
   if (!config.isDev) {
     const staticDir = path.isAbsolute(config.staticDir)
@@ -57,26 +60,53 @@ async function start() {
   await app.listen({ port: config.port, host: '0.0.0.0' })
   console.log('[server] Listening on port', config.port)
 
+  // Cross-site WebSocket hijack guard: a browser always sends Origin on WS
+  // upgrades. Same host as the request (any port) is fine; anything else must
+  // be allowlisted via WS_ALLOWED_ORIGINS. Non-browser clients without an
+  // Origin header pass — they can't ride a victim's cookie.
+  const wsOriginAllowed = (req: import('http').IncomingMessage): boolean => {
+    const origin = req.headers.origin
+    if (!origin) return true
+    try {
+      const originHost = new URL(origin).hostname
+      const reqHost = (req.headers.host ?? '').split(':')[0]
+      if (originHost === reqHost && originHost !== '') return true
+    } catch { /* malformed Origin → fall through to allowlist */ }
+    return config.wsAllowedOrigins.includes(origin)
+  }
+
   app.server.on('upgrade', (req: import('http').IncomingMessage, socket: import('net').Socket, head: Buffer) => {
     const url = new URL(req.url ?? '', 'http://localhost')
     if (url.pathname !== '/ws') { socket.destroy(); return }
+    if (!wsOriginAllowed(req)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+      socket.destroy()
+      return
+    }
     const sessionId = Number(url.searchParams.get('sessionId'))
     if (!Number.isInteger(sessionId) || sessionId <= 0) {
       socket.write('HTTP/1.1 400 Bad Request\r\n\r\n')
       socket.destroy()
       return
     }
-    const payload = authenticateUpgrade(req, (code, msg) => {
+    const payload = authenticateUpgrade(req, (t) => app.jwt.verify(t), (code, msg) => {
       socket.write('HTTP/1.1 ' + code + ' ' + msg + '\r\n\r\n')
       socket.destroy()
     })
     if (!payload) return
+    // Privilege is re-read from the DB per connection, not trusted from the JWT.
+    const level = liveLevel(db, payload.sub, payload.level)
+    if (level === 'none') {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+      socket.destroy()
+      return
+    }
     wss.handleUpgrade(req, socket, head, (ws) => {
       const client = ws as AuthedClient
       client.username = payload.username
       client.userId = payload.sub
       client.sessionId = sessionId
-      client.level = payload.level
+      client.level = level
       wss.emit('connection', ws, req)
     })
   })

@@ -14,14 +14,14 @@
  */
 
 import { DatabaseSync } from 'node:sqlite'
-import { getPlan } from '@letsgetbuff/shared'
+import { getPlan, getExercise } from '@letsgetbuff/shared'
 import { config } from './config.js'
 
 export type Db = DatabaseSync
 
 // ---- Migration ladder -------------------------------------------------------
 
-const CURRENT_DB_VERSION = 5
+const CURRENT_DB_VERSION = 7
 
 type Migration = (db: DatabaseSync) => void
 
@@ -128,6 +128,60 @@ const MIGRATIONS: Record<number, Migration> = {
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `)
+  },
+  6: (db) => {
+    // Reverse plank joins the warm-up on both workouts. The plan row was seeded
+    // once and never re-reads the catalog, so update the stored JSON in place —
+    // touching only the warmup strings so Claude-approved additions survive.
+    const row = db.prepare('SELECT json, version FROM plan WHERE id = 1').get() as
+      | { json: string; version: number }
+      | undefined
+    if (!row) return // fresh DB: seedPlan() will insert the new catalog after migrations
+    try {
+      const plan = JSON.parse(row.json) as { version: number; workouts: { id: string; warmup?: string }[] }
+      for (const w of plan.workouts) {
+        if (!w.warmup || /plank/i.test(w.warmup)) continue
+        if (w.id === 'A') {
+          // Elliptical is away from the floor — both plank sets go after the cardio.
+          w.warmup = `${w.warmup}, then 2x 30-second reverse plank`
+        } else if (w.id === 'B') {
+          // Rower sits next to the floor — the two plank sets interleave.
+          w.warmup = '5-minute rowing, then 30-second reverse plank, then 5-minute rowing, then 30-second reverse plank'
+        }
+      }
+      plan.version = row.version + 1
+      db.prepare('UPDATE plan SET json = ?, version = ? WHERE id = 1').run(
+        JSON.stringify(plan), plan.version,
+      )
+    } catch (err) {
+      console.error('[db] Migration 6: could not update plan warmups', err)
+    }
+  },
+  7: (db) => {
+    // Side plank (A) and standing calf raise (B) join the plan — appended to the
+    // stored row (same in-place pattern as migration 6) with defs taken from the
+    // catalog, so Claude-approved additions and any live reordering survive.
+    const row = db.prepare('SELECT json, version FROM plan WHERE id = 1').get() as
+      | { json: string; version: number }
+      | undefined
+    if (!row) return // fresh DB: seedPlan() inserts the current catalog
+    try {
+      const plan = JSON.parse(row.json) as { version: number; workouts: { id: string; exercises: { id: string }[] }[] }
+      const additions: Array<[string, string]> = [['A', 'side-plank'], ['B', 'standing-calf-raise']]
+      for (const [workoutId, exerciseId] of additions) {
+        const w = plan.workouts.find(x => x.id === workoutId)
+        const def = getExercise(exerciseId)
+        if (w && def && !w.exercises.some(e => e.id === exerciseId)) {
+          w.exercises.push(def as unknown as { id: string })
+        }
+      }
+      plan.version = row.version + 1
+      db.prepare('UPDATE plan SET json = ?, version = ? WHERE id = 1').run(
+        JSON.stringify(plan), plan.version,
+      )
+    } catch (err) {
+      console.error('[db] Migration 7: could not append new exercises', err)
+    }
   },
 }
 

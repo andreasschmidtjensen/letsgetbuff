@@ -3,9 +3,10 @@ import type { DraggableAttributes } from '@dnd-kit/core'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useStore } from '../../store/store'
+import { sendProxyLog } from '../../store/persistence'
 import { useTestMode } from '../../store/testMode'
 import { playDoneSound } from '../../lib/sounds'
-import { suggestNextWeight, repTargetFor } from '@letsgetbuff/shared'
+import { suggestNextWeight, repTargetFor, keyToDate } from '@letsgetbuff/shared'
 import type { ExerciseDef, ExerciseEntry, SetEntry, Session } from '@letsgetbuff/shared'
 import { RestTimer, ExerciseTimer, VideoCarousel, VideoPanel } from './timers'
 import { parseYouTubeUrl } from '../../lib/youtube'
@@ -96,7 +97,11 @@ export function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, a
   const prev = lastSessionBefore(read, exercise.id, dateStr)
 
   const lastWeight = prev?.sets.find(s => s.kg !== undefined)?.kg
-  const suggestion = suggestNextWeight(exercise.progressionType, lastWeight, prev?.feltEasy ?? false)
+  // Days since this exercise was last logged — 14+ triggers a deload suggestion.
+  const daysSinceLast = prev
+    ? Math.round((keyToDate(dateStr).getTime() - keyToDate(prev.date).getTime()) / 86400000)
+    : undefined
+  const suggestion = suggestNextWeight(exercise.progressionType, lastWeight, prev?.feltEasy ?? false, daysSinceLast)
   const target = repTargetFor(exercise, programWeek)
 
   const makePrefill = (i: number): SetEntry => {
@@ -131,15 +136,10 @@ export function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, a
       // Test mode: don't write to the partner's real log (own edits stay in-memory
       // via the reducer; the store suppresses their persistence).
       if (testMode) return
-      // Proxy mode: write to the partner's state server-side only.
-      fetch('/api/proxy-log', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sessionId, date: dateStr, exerciseId: exercise.id, workout: workoutType, entry: { sets: newSets, feltEasy: fe } }),
-      })
-        .then(() => onLogged?.())
-        .catch(() => { /* offline — partner will sync later */ })
+      // Proxy mode: write to the partner's state server-side only. A failed
+      // send is queued in localStorage and retried by the store's sync loop.
+      sendProxyLog({ sessionId, date: dateStr, exerciseId: exercise.id, workout: workoutType, entry: { sets: newSets, feltEasy: fe } })
+        .then(ok => { if (ok) onLogged?.() })
     } else {
       dispatch({ type: 'LOG_EXERCISE', date: dateStr, exerciseId: exercise.id, entry: { sets: newSets, feltEasy: fe } as ExerciseEntry })
     }

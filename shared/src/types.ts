@@ -1,6 +1,15 @@
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 export type WorkoutType = 'A' | 'B' | 'bike' | 'run' | 'rest'
+
+// User-added activities (v4). The calendar plan prescribes only the core gym
+// days; runs, rides and extra stretch sessions are added per date by the user.
+export type ActivityType = 'run' | 'bike' | 'stretch'
+
+export interface ActivityEntry {
+  type: ActivityType
+  minutes?: number // run/bike length; stretch sessions are tracked in stretchSessions
+}
 
 export type ProgressionType = 'dumbbell' | 'legPress' | 'rdl' | 'cable' | 'bodyweight' | 'timed'
 
@@ -54,7 +63,8 @@ export interface AppState {
   skippedWeeks: string[] // ISO week keys e.g. "2026-W23"
   sessions: Record<string, Session> // keyed by ISO date
   stretchSessions: Record<string, StretchSession> // keyed by ISO date
-  stretchSchedule: StretchScheduleSettings
+  stretchSchedule: StretchScheduleSettings // dormant since v4 (kept for old backups)
+  activities: Record<string, ActivityEntry[]> // keyed by ISO date (v4)
   metrics: Record<string, DayMetric> // keyed by ISO date
   milestones: Record<string, boolean> // milestone id -> achieved
 }
@@ -66,6 +76,7 @@ export const EMPTY_STATE: AppState = {
   sessions: {},
   stretchSessions: {},
   stretchSchedule: { enabled: true },
+  activities: {},
   metrics: {},
   milestones: {},
 }

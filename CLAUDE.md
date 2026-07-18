@@ -7,7 +7,9 @@ names stay `letsgetbuff` / `buff.db` — no rename pass.
 A two-user, server-backed workout tracker with **live shared exercise reordering** over
 WebSocket during joint workouts. React + Vite + TS front end, Fastify + SQLite backend,
 self-hosted in one Docker container on a Debian VPS. Exactly two users, one shared plan,
-separate per-user logs.
+separate per-user logs. The calendar prescribes only the two gym days (Tue = A, Sat = B);
+runs, rides and stretch sessions are **user-added activities** (`AppState.activities`,
+schema v4) logged from the Home view.
 
 ## Repo layout (npm-workspaces monorepo)
 - `client/` — Vite React app. `src/engine` = pure logic (schedule, progression, REUSED
@@ -32,15 +34,18 @@ only). One container serves the static client build + API + WS on **port 8585**.
 
 ## Hard invariants (must hold in every change)
 - **JSON export/import must never break.** Old backup files always import — migrated through
-  the schema-version ladder, never rejected. The `AppState` JSON (schemaVersion, startDate,
-  skippedWeeks, sessions, metrics, milestones) is a stable public contract. Internal storage
-  may change only via adapter functions (`fromBackupJSON` / `toBackupJSON`), never by changing
-  the file format. Any phase touching state/persistence must verify a real old backup
-  round-trips (export → import → identical effective state).
+  the schema-version ladder (`upgrade`/`migrate` in `shared/src/lib/migrate.ts`, run by BOTH
+  client and server on every read/write path), never rejected. The `AppState` JSON
+  (schemaVersion, startDate, skippedWeeks, sessions, stretchSessions, activities, metrics,
+  milestones) is a stable public contract; extend it only by bumping `SCHEMA_VERSION` and
+  adding a ladder step (`validateImport` in `client/src/store/persistence.ts` wraps `upgrade`).
+  Any phase touching state/persistence must verify a real old backup round-trips
+  (export → import → identical effective state).
 - **CWA auth is read-only.** Credentials verified against Calibre-Web Automated's `app.db`
   `user` table (Werkzeug `scrypt:` / `pbkdf2:sha256:` — detect by prefix). The app never stores
   passwords; it issues its own HttpOnly, SameSite JWT cookie. Privilege levels live in
-  `buff.db` (`user_privilege`), never in CWA.
+  `buff.db` (`user_privilege`), never in CWA. First-ever login bootstraps `admin`; every later
+  new account starts at `none` (locked out) until an admin grants a level.
 - **Bump `/api/health` `version` every phase** — it's how you confirm what's deployed.
 
 ## Data model (buff.db — separate from CWA's app.db)

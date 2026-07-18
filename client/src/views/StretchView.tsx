@@ -4,15 +4,16 @@ import { useEinkMode } from '../store/einkMode'
 import YouTubeEmbed from '../components/YouTubeEmbed'
 import { useCountdown } from '../components/CountdownTimer'
 import { preloadTimerSounds } from '../lib/sounds'
-import { dateKey, keyToDate } from '@letsgetbuff/shared'
+import { dateKey } from '@letsgetbuff/shared'
 import {
-  computeProgramWeek, isStretchDay, todayDayName,
   getSessionStretches, getStretchLevel, suggestStretchLevel,
 } from '@letsgetbuff/shared'
 import type { StretchDef, StretchLevelId, StretchEntry, SetEntry } from '@letsgetbuff/shared'
 
 const MUTE_KEY = 'letsgetbuff-mute'
 const SESSION_ID = 'daily'
+// Set by WorkoutView's "Start warm-up flow" button before navigating here.
+export const START_WARMUP_FLAG = 'letsgetbuff-start-warmup'
 
 function fmt(secs: number): string {
   const m = Math.floor(secs / 60)
@@ -59,7 +60,7 @@ function StretchCard({ stretch, dateStr, audioCtx, muted, focus }: {
   const level: StretchLevelId = override ?? suggested
   const lvl = getStretchLevel(stretch, level)
 
-  const needed = stretch.perSide ? 2 : 1
+  const needed = (lvl.perSide ?? stretch.perSide) ? 2 : 1
   const [sidesDone, setSidesDone] = useState(0)
   const [feltEasy, setFeltEasy] = useState(false)
 
@@ -191,10 +192,22 @@ export default function StretchView() {
   const todayStr = dateKey(today)
   const [dateStr, setDateStr] = useState(todayStr)
   const [focusIndex, setFocusIndex] = useState<number | null>(null)
+  // 'daily' = the full session (marks stretching done on finish); 'warmup' =
+  // the flows-only pre-gym session (never marks the day done).
+  const [focusSession, setFocusSession] = useState<'daily' | 'warmup'>('daily')
   const audioCtxRef = useRef<AudioContext | null>(null)
   const [muted, setMuted] = useState(() => localStorage.getItem(MUTE_KEY) === '1')
 
   useEffect(() => { preloadTimerSounds() }, [])
+
+  // Arriving from the WorkoutView warm-up button: launch the flows-only session.
+  useEffect(() => {
+    if (sessionStorage.getItem(START_WARMUP_FLAG) === '1') {
+      sessionStorage.removeItem(START_WARMUP_FLAG)
+      setFocusSession('warmup')
+      setFocusIndex(0)
+    }
+  }, [])
 
   const initAudio = () => {
     if (!audioCtxRef.current) {
@@ -209,23 +222,22 @@ export default function StretchView() {
   const holds = stretches.filter(s => s.kind === 'hold')
   const session = state.stretchSessions[dateStr]
 
-  const programWeek = state.startDate ? computeProgramWeek(state.startDate, state.skippedWeeks, keyToDate(dateStr)) : 1
-  const scheduledToday = isStretchDay(programWeek, todayDayName(keyToDate(dateStr)), state.stretchSchedule.enabled)
-
   const toggleMute = () => setMuted(m => { const n = !m; localStorage.setItem(MUTE_KEY, n ? '1' : '0'); return n })
 
   return (
     <div className="view-narrow">
       {focusIndex !== null && (
         <StretchFocus
-          stretches={stretches}
+          stretches={focusSession === 'warmup' ? getSessionStretches('warmup') : stretches}
           startIndex={focusIndex}
           dateStr={dateStr}
           audioCtx={initAudio()}
           muted={muted}
           onClose={(finished) => {
-            if (finished) dispatch({ type: 'MARK_STRETCH_DONE', date: dateStr, sessionId: SESSION_ID })
+            // The pre-gym warm-up never marks the stretch day done.
+            if (finished && focusSession === 'daily') dispatch({ type: 'MARK_STRETCH_DONE', date: dateStr, sessionId: SESSION_ID })
             setFocusIndex(null)
+            setFocusSession('daily')
           }}
         />
       )}
@@ -241,9 +253,7 @@ export default function StretchView() {
       <div className="card mb-12">
         <input type="date" className="input mb-8" value={dateStr} max={todayStr} onChange={e => setDateStr(e.target.value)} aria-label="Stretch date" />
         <div className="muted" style={{ fontSize: 13 }}>
-          {scheduledToday
-            ? 'Scheduled stretch day — flow first, then the static holds.'
-            : 'Not a scheduled stretch day, but you can stretch any time.'}
+          Stretch any day you like — flow first, then the static holds.
         </div>
       </div>
 

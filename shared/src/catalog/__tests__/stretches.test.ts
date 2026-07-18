@@ -8,8 +8,8 @@ describe('stretch catalog integrity', () => {
     expect(all.length).toBeGreaterThanOrEqual(16)
   })
 
-  it('plan version is 3 (videoId + vertical model)', () => {
-    expect(DEFAULT_STRETCH_PLAN.version).toBe(3)
+  it('plan version is 4 (neck stretch + 45s L3 dose)', () => {
+    expect(DEFAULT_STRETCH_PLAN.version).toBe(4)
   })
 
   it('every stretch has 3 ascending levels', () => {
@@ -26,6 +26,24 @@ describe('stretch catalog integrity', () => {
         expect((l.durationSeconds ?? 0) + (l.reps ?? 0)).toBeGreaterThan(0)
       }
     }
+  })
+
+  it('hold stretches step up to a 45s dose at level 3 (neck stays gentle at 30s)', () => {
+    for (const s of all.filter(x => x.kind === 'hold')) {
+      expect(s.levels[2].holdSeconds).toBe(s.id === 'neck' ? 30 : 45)
+    }
+  })
+
+  it('neck stretch covers the desk-work gap', () => {
+    const neck = all.find(s => s.id === 'neck')!
+    expect(neck.area).toContain('neck')
+    expect(neck.perSide).toBe(true)
+  })
+
+  it('per-side content has a per-side timer (chest L3 overrides its bilateral def)', () => {
+    const chest = all.find(s => s.id === 'chest')!
+    expect(chest.perSide).toBe(false) // L1/L2 doorway stretches hit both sides at once
+    expect(chest.levels[2].perSide).toBe(true) // L3 single-arm variant runs per side
   })
 
   it('stretch ids are unique', () => {

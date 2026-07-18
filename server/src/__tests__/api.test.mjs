@@ -16,6 +16,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { SCHEMA_VERSION } from '@letsgetbuff/shared'
 import { DatabaseSync } from 'node:sqlite'
 import Fastify from 'fastify'
 import cookie from '@fastify/cookie'
@@ -226,7 +227,7 @@ test('PUT upgrades a pre-v3 blob to the current schema before storing', async (t
 
   const getRes = await app.inject({ method: 'GET', url: '/api/state', cookies: { session: token } })
   const state = JSON.parse(getRes.body).state
-  assert.equal(state.schemaVersion, 3)               // upgraded on write
+  assert.equal(state.schemaVersion, SCHEMA_VERSION)  // upgraded on write
   assert.deepEqual(state.stretchSessions, {})        // filled by 2->3
   assert.deepEqual(state.stretchSchedule, { enabled: true })
 
@@ -271,7 +272,7 @@ test('GET migrates an older stored blob through the ladder before serving', asyn
 
   const res = await app.inject({ method: 'GET', url: '/api/state', cookies: { session: token } })
   const state = JSON.parse(res.body).state
-  assert.equal(state.schemaVersion, 3)                                        // migrated up the ladder
+  assert.equal(state.schemaVersion, SCHEMA_VERSION)                           // migrated up the ladder
   assert.equal(state.sessions['2026-01-02'].entries['back-extension'], undefined) // removed-exercise stripped (1->2)
   assert.ok(state.sessions['2026-01-02'].entries['leg-press'])                // real entry kept
   assert.deepEqual(state.stretchSchedule, { enabled: true })                  // 2->3 fields filled
@@ -297,6 +298,41 @@ test('viewer is blocked from PUT /api/state (403) but may GET', async (t) => {
 
   const getRes = await app.inject({ method: 'GET', url: '/api/state', cookies: { session: token } })
   assert.equal(getRes.statusCode, 200)
+
+  await app.close()
+})
+
+test('privilege changes apply on the next request, not the next login (real authGuard)', async (t) => {
+  const db = makeDb()
+  const uid = addUser(db, 'demi', 'user')
+
+  // Real authGuard + buffDb decoration, exactly as index.ts wires it.
+  const app = makeApp(db)
+  const { authGuard } = await import('../auth.js')
+  app.decorate('buffDb', db)
+  app.addHook('preHandler', authGuard.bind(app))
+  const { registerApiRoutes } = await import('../api.js')
+  registerApiRoutes(app, db)
+  await app.ready()
+
+  const token = makeToken(app, uid, 'demi', 'user') // JWT still claims 'user'
+  const put = () => app.inject({
+    method: 'PUT', url: '/api/state', cookies: { session: token },
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: VIEWER_STATE }),
+  })
+
+  assert.equal((await put()).statusCode, 200) // baseline: user may write
+
+  db.prepare("UPDATE user_privilege SET level = 'viewer' WHERE user_id = ?").run(uid)
+  assert.equal((await put()).statusCode, 403) // demotion effective immediately
+
+  db.prepare("UPDATE user_privilege SET level = 'none' WHERE user_id = ?").run(uid)
+  const getRes = await app.inject({ method: 'GET', url: '/api/state', cookies: { session: token } })
+  assert.equal(getRes.statusCode, 403) // full revocation blocks reads too
+
+  db.prepare("UPDATE user_privilege SET level = 'admin' WHERE user_id = ?").run(uid)
+  const adminRes = await app.inject({ method: 'GET', url: '/api/admin/users', cookies: { session: token } })
+  assert.equal(adminRes.statusCode, 200) // promotion works without re-login too
 
   await app.close()
 })

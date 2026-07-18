@@ -64,16 +64,10 @@ export interface WeekSchedule {
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
 export type DayName = typeof DAYS[number]
 
-export function scheduleFor(week: number): WeekSchedule {
-  if (week <= 4) {
-    return { mon: 'rest', tue: 'gym-a', wed: 'rest', thu: 'rest', fri: 'rest', sat: 'gym-b', sun: 'rest' }
-  }
-  const satActivity: DayActivity = week >= 13 ? 'bike' : 'gym-b'
-
-  if (week <= 8) {
-    return { mon: 'rest', tue: 'gym-a', wed: 'bike', thu: 'rest', fri: 'bike', sat: satActivity, sun: 'rest' }
-  }
-  return { mon: 'rest', tue: 'gym-a', wed: 'bike', thu: 'rest', fri: 'bike', sat: satActivity, sun: 'rest' }
+// The calendar plan prescribes only the core gym days. Runs, rides and stretch
+// sessions are user-added activities (AppState.activities), not scheduled here.
+export function scheduleFor(_week: number): WeekSchedule {
+  return { mon: 'rest', tue: 'gym-a', wed: 'rest', thu: 'rest', fri: 'rest', sat: 'gym-b', sun: 'rest' }
 }
 
 export function todayDayName(date: Date): DayName {
@@ -92,16 +86,5 @@ export function activityLabel(activity: DayActivity): string {
   }
 }
 
-// Optional stretch schedule (Phase 18). A separate layer over the day, not a
-// DayActivity (a stretch can co-occur with rest/cardio, and is logged
-// independently). Rule: every-other-day cadence, hand-tuned per phase to never
-// fall on a gym (A/B) day, no two stretch days consecutive. Mon/Wed/Fri
-// satisfies that for every phase, so it's a single source of truth.
-export function stretchScheduleFor(_week: number): Set<DayName> {
-  return new Set<DayName>(['mon', 'wed', 'fri'])
-}
-
-// Whether a weekday is a scheduled stretch day, gated by the user preference.
-export function isStretchDay(week: number, day: DayName, enabled: boolean): boolean {
-  return enabled && stretchScheduleFor(week).has(day)
-}
+// Stretch days are no longer prescribed (they were Mon/Wed/Fri until schema v4);
+// stretching is user-added like runs and rides, and logged in stretchSessions.

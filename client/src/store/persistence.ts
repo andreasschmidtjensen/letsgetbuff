@@ -59,6 +59,86 @@ export async function putServerState(state: AppState): Promise<{ ok: boolean; up
   return res.json() as Promise<{ ok: boolean; updatedAt: string }>
 }
 
+// Proxy-log queue (shared sessions). A set logged FOR the partner has no place
+// in our own AppState, so a failed PUT /api/proxy-log used to vanish silently.
+// Failed payloads are queued here and retried by the store's sync loop; latest
+// write per (session, date, exercise) wins, matching the server's merge.
+
+export const PROXY_QUEUE_KEY = 'letsgetbuff-proxy-queue'
+
+export interface ProxyLogPayload {
+  sessionId: number
+  date: string
+  exerciseId: string
+  workout: string
+  entry: unknown
+}
+
+function readProxyQueue(): ProxyLogPayload[] {
+  try {
+    const raw = localStorage.getItem(PROXY_QUEUE_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? (parsed as ProxyLogPayload[]) : []
+  } catch {
+    return []
+  }
+}
+
+function writeProxyQueue(queue: ProxyLogPayload[]): void {
+  if (queue.length === 0) localStorage.removeItem(PROXY_QUEUE_KEY)
+  else localStorage.setItem(PROXY_QUEUE_KEY, JSON.stringify(queue))
+}
+
+function enqueueProxyLog(payload: ProxyLogPayload): void {
+  const queue = readProxyQueue().filter(
+    p => !(p.sessionId === payload.sessionId && p.date === payload.date && p.exerciseId === payload.exerciseId),
+  )
+  queue.push(payload)
+  writeProxyQueue(queue)
+}
+
+async function attemptProxyLog(payload: ProxyLogPayload): Promise<boolean> {
+  const res = await fetch('/api/proxy-log', {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (res.ok) return true
+  if (res.status >= 500) throw new Error(`PUT /api/proxy-log failed: ${res.status}`)
+  // 4xx (session ended, privilege revoked, bad payload): retrying won't help.
+  console.warn('[proxy-log] rejected by server, dropping', res.status)
+  return false
+}
+
+// Send one proxy entry; on network/server failure queue it for the retry loop.
+// Resolves true only when the server accepted the write.
+export async function sendProxyLog(payload: ProxyLogPayload): Promise<boolean> {
+  try {
+    return await attemptProxyLog(payload)
+  } catch {
+    enqueueProxyLog(payload)
+    return false
+  }
+}
+
+// Retry everything queued; keeps whatever still fails. Returns the number of
+// entries remaining in the queue.
+export async function flushProxyQueue(): Promise<number> {
+  const queue = readProxyQueue()
+  if (queue.length === 0) return 0
+  const remaining: ProxyLogPayload[] = []
+  for (const payload of queue) {
+    try {
+      await attemptProxyLog(payload) // 4xx drops, ok clears — only throws re-queue
+    } catch {
+      remaining.push(payload)
+    }
+  }
+  writeProxyQueue(remaining)
+  return remaining.length
+}
+
 // Migration tracking
 
 export function isMigrated(username: string): boolean {

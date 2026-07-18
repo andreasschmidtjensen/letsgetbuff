@@ -13,25 +13,57 @@ export function formatDuration(secs: number): string {
   return `${secs}s`
 }
 
-// Parse a free-text warmup ("10-minute elliptical") into a label + duration so it
-// can be run as a timed warm-up slide in focus mode. Defaults to 5 min if no number.
-export function parseWarmup(raw: string | undefined): { label: string; seconds: number } | null {
+export interface WarmupStep { label: string; seconds: number; videoId?: string; vertical?: boolean }
+
+// Form videos for non-cardio warmup steps, matched by label keyword. Cardio
+// steps (elliptical/rowing) need no demo.
+const WARMUP_VIDEOS: Array<{ pattern: RegExp; videoId: string; vertical?: boolean }> = [
+  { pattern: /reverse plank/i, videoId: 'hS_KCFjbWKQ', vertical: true }, // Bharti Yoga
+]
+
+// One warmup part ("10-minute elliptical", "30-second plank") → label + duration.
+// Understands minutes and seconds; defaults to 5 min if no number.
+function parseWarmupPart(text: string): WarmupStep {
+  const video = WARMUP_VIDEOS.find(v => v.pattern.test(text))
+  const extra = video ? { videoId: video.videoId, vertical: video.vertical } : undefined
+  const sec = text.match(/(\d+)\s*-?\s*s(?:ec)/i)
+  if (sec) return { label: text, seconds: Math.max(10, parseInt(sec[1], 10)), ...extra }
+  const min = text.match(/(\d+)\s*-?\s*min/i)
+  const minutes = min ? parseInt(min[1], 10) : 5
+  return { label: text, seconds: Math.max(30, minutes * 60), ...extra }
+}
+
+// A "2x 30-second reverse plank" part expands into two identical steps, each
+// its own timed slide, labelled with a set counter.
+function expandPart(text: string): WarmupStep[] {
+  const m = text.match(/^(\d+)\s*[x×]\s*(.+)$/i)
+  if (!m) return [parseWarmupPart(text)]
+  const n = Math.max(1, parseInt(m[1], 10))
+  const base = parseWarmupPart(m[2])
+  if (n === 1) return [base]
+  return Array.from({ length: n }, (_, i) => ({ ...base, label: `${base.label} (${i + 1}/${n})` }))
+}
+
+// Parse a free-text warmup ("10-minute elliptical, then 2x 30-second reverse
+// plank") into timed steps, each run as its own warm-up slide in focus mode.
+// Steps are separated by ", then" / "then" / "+".
+export function parseWarmup(raw: string | undefined): WarmupStep[] | null {
   const text = raw?.trim()
   if (!text) return null
-  const m = text.match(/(\d+)\s*-?\s*min/i)
-  const minutes = m ? parseInt(m[1], 10) : 5
-  return { label: text, seconds: Math.max(30, minutes * 60) }
+  const parts = text.split(/\s*(?:,\s*then\b|\bthen\b|\+|,)\s*/i).filter(Boolean)
+  if (parts.length === 0) return null
+  return parts.flatMap(expandPart)
 }
 
 export function lastSessionBefore(
   state: { sessions: Record<string, Session> },
   exerciseId: string,
   beforeDate: string
-): { sets: SetEntry[]; feltEasy: boolean } | null {
+): { date: string; sets: SetEntry[]; feltEasy: boolean } | null {
   const dates = Object.keys(state.sessions).filter(d => d < beforeDate).sort().reverse()
   for (const date of dates) {
     const entry = state.sessions[date].entries[exerciseId]
-    if (entry) return entry
+    if (entry) return { date, ...entry }
   }
   return null
 }

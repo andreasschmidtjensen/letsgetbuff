@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useStore } from '../../store/store'
 import { useTestMode } from '../../store/testMode'
 import { TIMER_SOUNDS, getTimerSound, setTimerSound, playTimerEnd, preloadTimerSounds, type TimerSound } from '../../lib/sounds'
 
@@ -30,6 +29,7 @@ export function RestTimerCard() {
       <div className="card-title">Rest timer default</div>
       <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
         Duration shown after each completed set (except the last). You can still adjust ±15s on the fly during a workout.
+        Until you pick a value the default is 90 sec, rising to 2½ min from week 17 (heavier 4×6 sets).
       </p>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="Rest timer duration">
         {REST_SECS_OPTIONS.map(opt => (
@@ -114,25 +114,6 @@ export function TestModeCard() {
   )
 }
 
-// Stretch schedule toggle (synced — drives the overview)
-export function StretchScheduleCard() {
-  const { state, dispatch } = useStore()
-  const on = state.stretchSchedule.enabled
-  return (
-    <div className="card mb-12">
-      <div className="card-title">Stretch schedule</div>
-      <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
-        Schedules optional stretching every other day (Mon / Wed / Fri), avoiding your gym days, and shows it on your
-        overview. Stretching is always available from the Stretch tab even when this is off. This setting syncs across
-        your devices.
-      </p>
-      <button
-        className={`btn btn-sm ${on ? 'btn-primary' : 'btn-secondary'}`}
-        aria-pressed={on}
-        onClick={() => dispatch({ type: 'SET_STRETCH_SCHEDULE', enabled: !on })}
-      >
-        {on ? 'Stretch schedule: On' : 'Stretch schedule: Off'}
-      </button>
-    </div>
-  )
-}
+// The stretch schedule toggle was removed with the fixed Mon/Wed/Fri stretch
+// days (schema v4): stretching is now a user-added activity like runs and
+// rides. AppState.stretchSchedule stays in the shape so old backups round-trip.

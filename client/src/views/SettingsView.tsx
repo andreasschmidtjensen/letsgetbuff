@@ -8,7 +8,7 @@ import SyncBadge from '../components/settings/SyncBadge'
 import { Proposal, ExerciseProposalCard, ProposeExerciseForm } from '../components/settings/proposals'
 import ApiKeyCard from '../components/settings/ApiKeyCard'
 import AdminUsersCard from '../components/settings/AdminUsersCard'
-import { RestTimerCard, TimerSoundCard, TestModeCard, StretchScheduleCard } from '../components/settings/preferenceCards'
+import { RestTimerCard, TimerSoundCard, TestModeCard } from '../components/settings/preferenceCards'
 
 interface Props {
   onLogout?: () => void
@@ -128,9 +128,6 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
 
       {/* Test mode (frontend-only sandbox) */}
       <TestModeCard />
-
-      {/* Stretch schedule (Phase 18) */}
-      <StretchScheduleCard />
 
       {/* Start date */}
       <div className="card mb-12">

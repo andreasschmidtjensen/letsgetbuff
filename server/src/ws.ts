@@ -6,7 +6,9 @@
  * the presence Map are keyed per session. The message schema and the version-guard
  * last-write-wins contract are unchanged from Phase 6 — only the scope changed.
  *
- * Authenticated via the session-cookie JWT (HS256) using Node built-in crypto.
+ * Authenticated via the session-cookie JWT, verified by the SAME @fastify/jwt
+ * instance the HTTP routes use (the upgrade handler passes its verify function
+ * in) — one verifier implementation, no drift.
  *
  * Protocol (unchanged):
  *   Client -> Server:
@@ -22,11 +24,9 @@
  */
 
 import { IncomingMessage } from 'node:http'
-import { createHmac, timingSafeEqual } from 'node:crypto'
 import { WebSocketServer, WebSocket } from 'ws'
 import cookie from 'cookie'
 import type { DatabaseSync } from 'node:sqlite'
-import { config } from './config.js'
 import type { Privilege } from '@letsgetbuff/shared'
 import { liveOrderForSession, setLiveOrderForSession, isParticipant } from './sessions.js'
 
@@ -43,50 +43,6 @@ interface JwtPayload {
   sub: number
   username: string
   level: Privilege
-}
-
-// ── JWT HS256 verification (no external dep) ──────────────────────────────────
-
-function b64urlDecode(s: string): Buffer {
-  return Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64')
-}
-
-function verifyHS256(token: string, secret: string): Record<string, unknown> | null {
-  const parts = token.split('.')
-  if (parts.length !== 3) return null
-  const [header, payload, sig] = parts
-  const expected = createHmac('sha256', secret)
-    .update(`${header}.${payload}`)
-    .digest('base64url')
-  try {
-    if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null
-  } catch {
-    return null
-  }
-  try {
-    return JSON.parse(b64urlDecode(payload).toString('utf8')) as Record<string, unknown>
-  } catch {
-    return null
-  }
-}
-
-function verifySessionCookie(rawCookies: string | undefined): JwtPayload | null {
-  if (!rawCookies) return null
-  const parsed = cookie.parse(rawCookies)
-  const token = parsed['session']
-  if (!token) return null
-  const payload = verifyHS256(token, config.sessionSecret)
-  if (!payload) return null
-  const sub = payload['sub']
-  const username = payload['username']
-  if (typeof sub !== 'number' || typeof username !== 'string') return null
-  // Check expiry if present
-  const exp = payload['exp']
-  if (typeof exp === 'number' && Date.now() / 1000 > exp) return null
-  // Older tokens predate the level claim — treat as 'user' (same as auth.meHandler).
-  const rawLevel = payload['level']
-  const level: Privilege = rawLevel === 'none' || rawLevel === 'viewer' || rawLevel === 'admin' ? rawLevel : 'user'
-  return { sub, username, level }
 }
 
 // ── WebSocket server factory ──────────────────────────────────────────────────
@@ -182,11 +138,29 @@ export function createWsServer(db: DatabaseSync): WebSocketServer {
 
 // ── Upgrade auth ──────────────────────────────────────────────────────────────
 
+/** Verifies a session token and returns its claims; throws if invalid/expired. */
+export type TokenVerifier = (token: string) => unknown
+
 export function authenticateUpgrade(
   req: IncomingMessage,
+  verify: TokenVerifier,
   reject: (statusCode: number, message: string) => void,
 ): JwtPayload | null {
-  const payload = verifySessionCookie(req.headers.cookie)
-  if (!payload) { reject(401, 'Unauthorized'); return null }
-  return payload
+  const raw = req.headers.cookie
+  const token = raw ? cookie.parse(raw)['session'] : undefined
+  if (!token) { reject(401, 'Unauthorized'); return null }
+  let payload: Record<string, unknown>
+  try {
+    payload = verify(token) as Record<string, unknown> // exp checked by the verifier
+  } catch {
+    reject(401, 'Unauthorized')
+    return null
+  }
+  const sub = payload['sub']
+  const username = payload['username']
+  if (typeof sub !== 'number' || typeof username !== 'string') { reject(401, 'Unauthorized'); return null }
+  // Older tokens predate the level claim — treat as 'user' (same as auth.meHandler).
+  const rawLevel = payload['level']
+  const level: Privilege = rawLevel === 'none' || rawLevel === 'viewer' || rawLevel === 'admin' ? rawLevel : 'user'
+  return { sub, username, level }
 }

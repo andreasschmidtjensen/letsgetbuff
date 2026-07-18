@@ -4,7 +4,7 @@ import type { ExerciseDef, Session } from '@letsgetbuff/shared'
 import TestModeBanner from '../TestModeBanner'
 import { WarmupCard } from './timers'
 import { ExerciseLogger } from './ExerciseLogger'
-import { exerciseDoneIn } from './helpers'
+import { exerciseDoneIn, WarmupStep } from './helpers'
 
 interface FocusModeProps {
   exercises: ExerciseDef[]
@@ -25,23 +25,26 @@ interface FocusModeProps {
   refreshPartner?: () => void
   /** Broadcast which exercise is focused (presence for a two-device shared session). */
   sendPresence?: (exerciseId: string) => void
-  /** Optional timed warm-up shown as the first slide. */
-  warmup?: { label: string; seconds: number } | null
+  /** Optional timed warm-up steps, each shown as its own leading slide. */
+  warmup?: WarmupStep[] | null
 }
 
 const WARMUP_SLIDE = '__warmup__'
 
 export default function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose, readOnly, muted, restDefaultSecs, sessionId, workoutType, partnerName, partnerState, refreshPartner, sendPresence, warmup }: FocusModeProps) {
   const { state } = useStore()
-  // Slides = optional warm-up + the plan exercises, navigated by id so a live
-  // reorder can't teleport us.
-  const slides = warmup ? [WARMUP_SLIDE, ...exercises.map(e => e.id)] : exercises.map(e => e.id)
+  // Slides = optional warm-up steps + the plan exercises, navigated by id so a
+  // live reorder can't teleport us.
+  const warmupSteps = warmup ?? []
+  const warmupIds = warmupSteps.map((_, i) => `${WARMUP_SLIDE}${i}`)
+  const slides = [...warmupIds, ...exercises.map(e => e.id)]
   const [currentId, setCurrentId] = useState(slides[Math.min(Math.max(startIndex, 0), slides.length - 1)] ?? slides[0])
-  const [warmupDone, setWarmupDone] = useState(false)
+  const [warmupsDone, setWarmupsDone] = useState<boolean[]>(() => warmupSteps.map(() => false))
 
   let idx = slides.indexOf(currentId)
   if (idx === -1) idx = Math.min(startIndex, slides.length - 1)
-  const onWarmup = slides[idx] === WARMUP_SLIDE
+  const warmupIdx = idx < warmupSteps.length ? idx : -1
+  const onWarmup = warmupIdx !== -1
   const ex = onWarmup ? null : exercises.find(e => e.id === slides[idx])
 
   // Broadcast presence whenever the focused exercise changes (not for the warm-up).
@@ -55,7 +58,7 @@ export default function FocusMode({ exercises, startIndex, dateStr, programWeek,
   const shared = Boolean(partnerName && partnerState)
   let allDone: boolean
   if (onWarmup) {
-    allDone = warmupDone
+    allDone = warmupsDone[warmupIdx]
   } else {
     const selfDone = exerciseDoneIn(state.sessions, dateStr, ex!, programWeek)
     const partnerDone = shared ? exerciseDoneIn(partnerState!.sessions, dateStr, ex!, programWeek) : true
@@ -80,9 +83,9 @@ export default function FocusMode({ exercises, startIndex, dateStr, programWeek,
       <div className="focus-body">
         {onWarmup ? (
           <WarmupCard
-            warmup={warmup!}
-            done={warmupDone}
-            onDone={() => setWarmupDone(true)}
+            warmup={warmupSteps[warmupIdx]}
+            done={warmupsDone[warmupIdx]}
+            onDone={() => setWarmupsDone(d => d.map((v, i) => (i === warmupIdx ? true : v)))}
             audioCtx={audioCtx}
             onAudioCtxInit={onAudioCtxInit}
             muted={muted}
@@ -136,9 +139,13 @@ export default function FocusMode({ exercises, startIndex, dateStr, programWeek,
             className={`btn ${allDone ? 'btn-primary focus-next-ready' : 'btn-secondary'}`}
             style={{ flex: 2 }}
             onClick={goNext}
-            aria-label={onWarmup ? 'Start workout' : 'Next exercise'}
+            aria-label={onWarmup ? (warmupIdx === warmupSteps.length - 1 ? 'Start workout' : 'Next warm-up') : 'Next exercise'}
           >
-            {allDone ? (onWarmup ? 'Start workout →' : 'Next exercise →') : 'Next'}
+            {allDone
+              ? (onWarmup
+                ? (warmupIdx === warmupSteps.length - 1 ? 'Start workout →' : 'Next warm-up →')
+                : 'Next exercise →')
+              : 'Next'}
           </button>
         ) : (
           <button

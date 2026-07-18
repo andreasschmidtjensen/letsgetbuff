@@ -26,6 +26,14 @@ export const config = {
   staticDir: process.env.STATIC_DIR ?? '../client/dist',
   isDev,
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
+  // Set COOKIE_SECURE=1 when the app is served over HTTPS (reverse proxy/TLS):
+  // the session cookie then never travels over plain HTTP. Off by default
+  // because the stock deployment is plain HTTP on the LAN/VPN port.
+  cookieSecure: process.env.COOKIE_SECURE === '1',
+  // Origins allowed to open the WebSocket (cross-site WS hijack guard). Empty
+  // default = same-host only (any port), which fits the stock deployment.
+  wsAllowedOrigins: (process.env.WS_ALLOWED_ORIGINS ?? '')
+    .split(',').map(s => s.trim()).filter(Boolean),
 } as const
 
 export type Config = typeof config

@@ -19,6 +19,7 @@ import { useStore } from '../store/store'
 import { useLiveOrder } from '../store/useLiveOrder'
 import { preloadTimerSounds } from '../lib/sounds'
 import StartSessionModal from '../components/StartSessionModal'
+import { START_WARMUP_FLAG } from './StretchView'
 import { parseWarmup } from '../components/workout/helpers'
 import { SessionTimer } from '../components/workout/timers'
 import { SortableExerciseLogger } from '../components/workout/ExerciseLogger'
@@ -50,17 +51,19 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
   const [focusIndex, setFocusIndex] = useState<number | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const [muted, setMuted] = useState(() => localStorage.getItem(MUTE_KEY) === '1')
-  const [restDefaultSecs, setRestDefaultSecs] = useState(() => {
+  // null = no explicit preference → band-aware default (heavier 4×6 sets from
+  // week 17 get 2.5 min instead of 90s).
+  const [restPrefSecs, setRestPrefSecs] = useState<number | null>(() => {
     const saved = localStorage.getItem(REST_SECS_KEY)
-    return saved ? Number(saved) : REST_SECS_DEFAULT
+    return saved ? Number(saved) : null
   })
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null)
 
-  // Sync restDefaultSecs when another tab/component updates localStorage
+  // Sync the rest preference when another tab/component updates localStorage
   useEffect(() => {
     const handler = (e: StorageEvent) => {
       if (e.key === REST_SECS_KEY) {
-        setRestDefaultSecs(e.newValue ? Number(e.newValue) : REST_SECS_DEFAULT)
+        setRestPrefSecs(e.newValue ? Number(e.newValue) : null)
       }
     }
     window.addEventListener('storage', handler)
@@ -118,6 +121,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
   const programWeek = state.startDate
     ? computeProgramWeek(state.startDate, state.skippedWeeks, keyToDate(dateStr))
     : 1
+  const restDefaultSecs = restPrefSecs ?? (repBandFor(programWeek) === 3 ? 150 : REST_SECS_DEFAULT)
 
   const planExercises = isGym ? getWorkoutExercises(workoutType as GymWorkout, programWeek) : []
   const planOrder = planExercises.map(e => e.id)
@@ -450,7 +454,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
                     exercise={ex}
                     dateStr={dateStr}
                     programWeek={programWeek}
-                    onStartFocus={() => { setFocusIndex(focusWarmup ? i + 1 : i); sendPresence(ex.id) }}
+                    onStartFocus={() => { setFocusIndex(focusWarmup ? i + focusWarmup.length : i); sendPresence(ex.id) }}
                     audioCtx={audioCtxRef.current}
                     onAudioCtxInit={initAudio}
                     partnerHere={[...partnerPresence.entries()].find(([, eid]) => eid === ex.id)?.[0]}
@@ -480,9 +484,18 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
             <div className="card-title">Optional stretch</div>
             <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
               Mobility &amp; flexibility, logged separately from this workout.
-              {(workoutType === 'A' || workoutType === 'B' || workoutType === 'bike') ? ' A warm-up flow is available there too.' : ''}
             </p>
-            <button className="btn btn-secondary btn-sm" onClick={() => onNavigate('stretch')}>Open stretch &rarr;</button>
+            <div className="row gap-8" style={{ flexWrap: 'wrap' }}>
+              {(workoutType === 'A' || workoutType === 'B') && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => { sessionStorage.setItem(START_WARMUP_FLAG, '1'); onNavigate('stretch') }}
+                >
+                  ▶ Start warm-up flow (~5 min)
+                </button>
+              )}
+              <button className="btn btn-secondary btn-sm" onClick={() => onNavigate('stretch')}>Open stretch &rarr;</button>
+            </div>
           </div>
         )}
 

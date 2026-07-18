@@ -226,6 +226,7 @@ export async function loginHandler(
     .setCookie('session', token, {
       httpOnly: true,
       sameSite: 'lax',
+      secure: config.cookieSecure,
       path: '/',
       maxAge: 30 * 24 * 60 * 60, // 30 days in seconds
     })
@@ -254,10 +255,9 @@ export async function meHandler(
 // ── Privilege guard (Phase 11) ──────────────────────────────────────────────
 
 /**
- * preHandler factory: rejects with 403 unless the caller's JWT level is ≥ `min`.
- * Level is read from the JWT (set at login), so a level change takes effect on
- * the user's next login / token refresh — acceptable per the backlog. Apply only
- * after `authGuard` has attached `req.user`.
+ * preHandler factory: rejects with 403 unless the caller's level is ≥ `min`.
+ * `req.user.level` is refreshed from buff.db by authGuard on every request, so
+ * privilege changes apply immediately. Apply only after `authGuard`.
  */
 export function requirePrivilege(min: Privilege) {
   return async function (req: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -272,6 +272,27 @@ export function requirePrivilege(min: Privilege) {
 // ── Auth preHandler (guards /api/* except public routes) ───────────────────
 
 const PUBLIC_ROUTES = new Set(['/api/login', '/api/health'])
+
+/**
+ * Current privilege straight from buff.db — the authoritative source. The JWT
+ * level (baked in at login) is only the fallback if the row is missing, so a
+ * demotion/revocation takes effect on the next request, not the next login.
+ */
+export function liveLevel(
+  buffDb: DatabaseSync,
+  userId: number,
+  fallback: Privilege | undefined,
+): Privilege {
+  try {
+    const row = buffDb
+      .prepare('SELECT level FROM user_privilege WHERE user_id = ?')
+      .get(userId) as { level: Privilege } | undefined
+    if (row) return row.level
+  } catch {
+    // table missing mid-migration — fall through to the JWT claim
+  }
+  return fallback ?? 'user'
+}
 
 export async function authGuard(
   this: FastifyInstance,
@@ -289,6 +310,11 @@ export async function authGuard(
 
   try {
     const payload = (this as any).jwt.verify(token)
+    const buffDb = (this as any).buffDb as DatabaseSync | undefined
+    if (buffDb) payload.level = liveLevel(buffDb, payload.sub, payload.level)
+    if (payload.level === 'none') {
+      return reply.code(403).send({ error: 'Access revoked' })
+    }
     ;(req as any).user = payload
   } catch {
     return reply.code(401).send({ error: 'Session expired' })

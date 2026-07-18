@@ -44,7 +44,7 @@ export const WORKOUTS: WorkoutDef[] = [
   {
     id: 'A',
     name: 'Push & Hinge',
-    warmup: '10-minute elliptical',
+    warmup: '10-minute elliptical, then 2x 30-second reverse plank',
     exercises: [
       {
         id: 'dumbbell-lunge',
@@ -133,12 +133,33 @@ export const WORKOUTS: WorkoutDef[] = [
           band3: { sets: 3, seconds: 60 },
         },
       },
+      {
+        id: 'side-plank',
+        name: 'Side Plank',
+        sets: 2,
+        reps: null,
+        seconds: 20,
+        perSide: true,
+        progressionType: 'timed',
+        requiresKg: false,
+        videoUrls: ['https://www.youtube.com/shorts/cSIWldRoKTo'],
+        alternatives: ['Suitcase carry', 'Side plank on knees'],
+        notes: 'Elbow under shoulder, body in one line. Hips high — no sagging.',
+        safetyCues: ['back'],
+        repProgression: {
+          band1: { sets: 2, seconds: 20 },
+          band2: { sets: 2, seconds: 30 },
+          band3: { sets: 2, seconds: 40 },
+        },
+      },
     ],
   },
   {
     id: 'B',
     name: 'Pull & Quad',
-    warmup: '10-minute rowing',
+    // Rower and floor are side by side, so the two plank sets interleave with
+    // the row blocks; on A the elliptical is elsewhere, so both sets come after.
+    warmup: '5-minute rowing, then 30-second reverse plank, then 5-minute rowing, then 30-second reverse plank',
     exercises: [
       {
         id: 'leg-press',
@@ -274,6 +295,23 @@ export const WORKOUTS: WorkoutDef[] = [
           band3: { sets: 3, reps: 12 },
         },
       },
+      {
+        id: 'standing-calf-raise',
+        name: 'Standing Calf Raise',
+        sets: 3,
+        reps: 12,
+        progressionType: 'dumbbell',
+        requiresKg: true,
+        videoUrls: ['https://www.youtube.com/shorts/8sT7Ne3Kzwc'],
+        alternatives: ['Seated calf raise', 'Single-leg calf raise'],
+        notes: 'Full range: deep heel stretch at the bottom, pause tall on the toes. Hold a dumbbell for load.',
+        safetyCues: [],
+        repProgression: {
+          band1: { sets: 3, reps: 12 },
+          band2: { sets: 3, reps: 12 },
+          band3: { sets: 3, reps: 12, addLoad: true },
+        },
+      },
     ],
   },
 ]
@@ -293,7 +331,7 @@ export interface Plan {
 }
 
 export const DEFAULT_PLAN: Plan = {
-  version: 1,
+  version: 3, // v2: reverse plank in warmups (DB migration 6); v3: side plank + calf raise (migration 7)
   workouts: WORKOUTS,
 }
 

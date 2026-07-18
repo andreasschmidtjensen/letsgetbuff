@@ -69,25 +69,16 @@ describe('phaseFor', () => {
 })
 
 describe('scheduleFor', () => {
-  it('Phase 1: Tue=gym-a, Sat=gym-b, rest=rest', () => {
-    const s = scheduleFor(1)
-    expect(s.tue).toBe('gym-a')
-    expect(s.sat).toBe('gym-b')
-    expect(s.mon).toBe('rest')
-    expect(s.wed).toBe('rest')
+  it('prescribes only the core gym days: Tue=gym-a, Sat=gym-b, rest otherwise', () => {
+    for (const w of [1, 5, 13, 26]) {
+      const s = scheduleFor(w)
+      expect(s.tue).toBe('gym-a')
+      expect(s.sat).toBe('gym-b')
+      expect([s.mon, s.wed, s.thu, s.fri, s.sun]).toEqual(['rest', 'rest', 'rest', 'rest', 'rest'])
+    }
   })
 
-  it('Wk 5-8: adds Wed and Fri bike, Sat still gym-b', () => {
-    const s = scheduleFor(5)
-    expect(s.wed).toBe('bike')
-    expect(s.fri).toBe('bike')
-    expect(s.sat).toBe('gym-b')
-  })
-
-  it('Wk 13+: Sat becomes bike instead of gym-b', () => {
-    const s13 = scheduleFor(13)
-    expect(s13.sat).toBe('bike')
-    const s12 = scheduleFor(12)
-    expect(s12.sat).toBe('gym-b')
+  it('never drops Workout B (regression: wk13+ used to swap Sat to bike)', () => {
+    for (let w = 1; w <= 26; w++) expect(scheduleFor(w).sat).toBe('gym-b')
   })
 })
