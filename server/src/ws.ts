@@ -25,7 +25,8 @@
 
 import { IncomingMessage } from 'node:http'
 import { WebSocketServer, WebSocket } from 'ws'
-import cookie from 'cookie'
+// Named import — the CI-installed `cookie` build exposes no default export.
+import { parse as parseCookies } from 'cookie'
 import type { DatabaseSync } from 'node:sqlite'
 import type { Privilege } from '@letsgetbuff/shared'
 import { liveOrderForSession, setLiveOrderForSession, isParticipant } from './sessions.js'
@@ -147,7 +148,7 @@ export function authenticateUpgrade(
   reject: (statusCode: number, message: string) => void,
 ): JwtPayload | null {
   const raw = req.headers.cookie
-  const token = raw ? cookie.parse(raw)['session'] : undefined
+  const token = raw ? parseCookies(raw)['session'] : undefined
   if (!token) { reject(401, 'Unauthorized'); return null }
   let payload: Record<string, unknown>
   try {
