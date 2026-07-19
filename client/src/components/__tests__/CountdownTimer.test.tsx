@@ -102,6 +102,29 @@ test('start() after a changed seconds prop counts the new duration (Stretch leve
   expect(onComplete).toHaveBeenCalledWith(45)
 })
 
+test('countdown follows the wall clock across a background-tab gap (issue #2)', () => {
+  const onComplete = vi.fn()
+  render(<Harness seconds={60} autoStart onComplete={onComplete} />)
+  tick(5)
+  expect(ctl.remaining).toBe(55)
+
+  // Background tab: the clock advances 30s but no interval callback fires.
+  // The first throttled tick after returning must catch up to the wall clock.
+  act(() => { vi.setSystemTime(Date.now() + 30_000) })
+  tick(0.25)
+  expect(ctl.remaining).toBe(25)
+
+  // Jump past the deadline entirely; the visibilitychange resync completes it.
+  act(() => {
+    vi.setSystemTime(Date.now() + 120_000)
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  expect(ctl.remaining).toBe(0)
+  expect(ctl.running).toBe(false)
+  expect(onComplete).toHaveBeenCalledTimes(1)
+  expect(onComplete).toHaveBeenCalledWith(60)
+})
+
 test('achieved() reports elapsed seconds for an early finish', () => {
   render(<Harness seconds={60} autoStart adjustAffectsTotal />)
   tick(10)

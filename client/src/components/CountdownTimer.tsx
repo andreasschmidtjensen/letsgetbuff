@@ -45,6 +45,10 @@ export function useCountdown(opts: UseCountdownOpts): Countdown {
   const remainingRef = useRef(seconds)
   const totalRef = useRef(seconds)
   const firedRef = useRef(false)
+  // Wall-clock deadline (ms epoch) for the running countdown. Browsers throttle
+  // or suspend setInterval in background tabs, so ticks can't be counted —
+  // remaining is always derived from this deadline instead.
+  const endAtRef = useRef(0)
 
   // Keep the latest ding inputs/callback without re-subscribing the interval.
   const dingRef = useRef<{ audioCtx: AudioContext | null; muted: boolean; resolveAudioCtx?: () => AudioContext; onComplete?: (n: number) => void }>({
@@ -54,10 +58,14 @@ export function useCountdown(opts: UseCountdownOpts): Countdown {
 
   useEffect(() => {
     if (!running) return
-    const id = setInterval(() => {
-      remainingRef.current -= 1
-      setRemaining(remainingRef.current)
-      if (remainingRef.current <= 0) {
+    endAtRef.current = Date.now() + remainingRef.current * 1000
+    const tick = () => {
+      const next = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000))
+      if (next !== remainingRef.current) {
+        remainingRef.current = next
+        setRemaining(next)
+      }
+      if (next <= 0) {
         clearInterval(id)
         setRunning(false)
         if (!firedRef.current) {
@@ -71,8 +79,16 @@ export function useCountdown(opts: UseCountdownOpts): Countdown {
           done?.(totalRef.current)
         }
       }
-    }, 1000)
-    return () => clearInterval(id)
+    }
+    const id = setInterval(tick, 250)
+    // Resync the moment the tab becomes visible again — throttled intervals mean
+    // a backgrounded countdown may be long past its deadline when the user returns.
+    const onVisibilityChange = () => { if (!document.hidden) tick() }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [running])
 
   // Track a changing `seconds` prop (e.g. StretchView swaps the hold length when
@@ -90,6 +106,7 @@ export function useCountdown(opts: UseCountdownOpts): Countdown {
 
   const start = useCallback(() => {
     remainingRef.current = totalRef.current
+    endAtRef.current = Date.now() + totalRef.current * 1000
     setRemaining(totalRef.current)
     firedRef.current = false
     setRunning(true)
@@ -100,6 +117,7 @@ export function useCountdown(opts: UseCountdownOpts): Countdown {
   const adjust = useCallback((delta: number) => {
     const floor = adjustAffectsTotal ? 1 : 5
     const nextRemaining = Math.max(floor, remainingRef.current + delta)
+    endAtRef.current += (nextRemaining - remainingRef.current) * 1000
     remainingRef.current = nextRemaining
     setRemaining(nextRemaining)
     if (adjustAffectsTotal) {
