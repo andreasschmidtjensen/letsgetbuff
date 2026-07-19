@@ -1,9 +1,14 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useStore } from '../store/store'
 import { useEinkMode } from '../store/einkMode'
-import { computeProgramWeek, phaseFor, scheduleFor, isoWeekKey, weekKeyToMonday, todayDayName, activityLabel, DayActivity } from '@letsgetbuff/shared'
+import HomeWorkout from '../components/HomeWorkout'
+import { preloadTimerSounds } from '../lib/sounds'
+import { computeProgramWeek, phaseFor, scheduleFor, isoWeekKey, weekKeyToMonday, todayDayName, activityLabel, DayActivity, homeWorkoutMinutes } from '@letsgetbuff/shared'
 import { dateKey, keyToDate, addDays } from '@letsgetbuff/shared'
 import type { Tab, Session, ActivityEntry, ActivityType } from '@letsgetbuff/shared'
+
+// Same key StretchView uses — one mute preference for all timer dings.
+const MUTE_KEY = 'letsgetbuff-mute'
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
@@ -60,7 +65,7 @@ function sessionActivity(w: Session['workout']): DayActivity {
 }
 
 function activityEntryLabel(a: ActivityEntry): string {
-  const name = a.type === 'run' ? 'Run' : a.type === 'bike' ? 'Bike' : 'Stretch'
+  const name = a.type === 'run' ? 'Run' : a.type === 'bike' ? 'Bike' : a.type === 'home' ? 'Home workout' : 'Stretch'
   return a.minutes ? `${name} ${a.minutes} min` : name
 }
 
@@ -90,6 +95,7 @@ function AddActivity({ date, onNavigate }: { date: string; onNavigate: (tab: Tab
       >
         <option value="run">Run</option>
         <option value="bike">Bike</option>
+        <option value="home">Home workout</option>
         <option value="stretch">Stretch program</option>
       </select>
       {type !== 'stretch' && (
@@ -133,8 +139,29 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
   const currentWeekKey = isoWeekKey(today)
   const [startInput, setStartInput] = useState(state.startDate ?? '')
   const [weekOffset, setWeekOffset] = useState(0)
+  const [homeWorkoutOpen, setHomeWorkoutOpen] = useState(false)
+  const audioCtxRef = useRef<AudioContext | null>(null)
 
   const isSkipped = state.skippedWeeks.includes(currentWeekKey)
+
+  // Start the guided bodyweight circuit (issue #1). AudioContext must be
+  // created inside the click gesture or mobile browsers keep it suspended.
+  const startHomeWorkout = () => {
+    preloadTimerSounds()
+    if (!audioCtxRef.current) {
+      const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (Ctor) audioCtxRef.current = new Ctor()
+    }
+    setHomeWorkoutOpen(true)
+  }
+
+  const homeWorkoutOverlay = homeWorkoutOpen ? (
+    <HomeWorkout
+      audioCtx={audioCtxRef.current}
+      muted={localStorage.getItem(MUTE_KEY) === '1'}
+      onClose={() => setHomeWorkoutOpen(false)}
+    />
+  ) : null
 
   if (!state.startDate) {
     return (
@@ -172,6 +199,7 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
   const todayDisplayActivity = todaySession ? sessionActivity(todaySession.workout) : todayActivity
   const stretchDoneToday = Boolean(state.stretchSessions[todayStr]?.done)
   const todayActivities = state.activities[todayStr] ?? []
+  const homeDoneToday = todayActivities.some(a => a.type === 'home')
 
   const nextGym = nextGymSession(state.startDate, state.skippedWeeks, state.sessions, today)
 
@@ -189,6 +217,7 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
     const isTodayGym = todayActivity === 'gym-a' || todayActivity === 'gym-b'
     return (
       <div>
+        {homeWorkoutOverlay}
         <div className="card">
           <div style={{ fontSize: 15, fontWeight: 700 }}>
             WEEK {programWeek} / 26 · PHASE {phaseFor(programWeek).phase}
@@ -234,6 +263,9 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
           </div>
           <button className="btn btn-secondary w-full mt-8" onClick={() => onNavigate('stretch')}>
             Stretch (optional){stretchDoneToday ? ' ✓' : ''}
+          </button>
+          <button className="btn btn-secondary w-full mt-8" onClick={startHomeWorkout}>
+            Home workout ~{homeWorkoutMinutes()} min{homeDoneToday ? ' ✓' : ''}
           </button>
         </div>
 
@@ -290,6 +322,7 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
 
   return (
     <div className="home-grid">
+      {homeWorkoutOverlay}
       {/* Phase + week */}
       <div className="card">
         <div className="row gap-8 mb-8">
@@ -386,6 +419,13 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
             <span style={{ fontSize: 14, color: 'var(--green)' }}>Stretch (optional)</span>
             {stretchDoneToday && <span className="badge badge-green">Done</span>}
             <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => onNavigate('stretch')}>Open &rarr;</button>
+          </div>
+        </div>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          <div className="row gap-8" style={{ alignItems: 'center' }}>
+            <span style={{ fontSize: 14, color: 'var(--accent)' }}>Home workout · ~{homeWorkoutMinutes()} min, no equipment</span>
+            {homeDoneToday && <span className="badge badge-green">Done</span>}
+            <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={startHomeWorkout}>Start &rarr;</button>
           </div>
         </div>
       </div>

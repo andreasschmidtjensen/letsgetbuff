@@ -3,12 +3,14 @@ export const SCHEMA_VERSION = 4
 export type WorkoutType = 'A' | 'B' | 'bike' | 'run' | 'rest'
 
 // User-added activities (v4). The calendar plan prescribes only the core gym
-// days; runs, rides and extra stretch sessions are added per date by the user.
-export type ActivityType = 'run' | 'bike' | 'stretch'
+// days; runs, rides, extra stretch sessions and home workouts are added per
+// date by the user. `home` (guided bodyweight circuit, issue #1) is a purely
+// additive union value — old backups round-trip untouched, so no schema bump.
+export type ActivityType = 'run' | 'bike' | 'stretch' | 'home'
 
 export interface ActivityEntry {
   type: ActivityType
-  minutes?: number // run/bike length; stretch sessions are tracked in stretchSessions
+  minutes?: number // run/bike/home length; stretch sessions are tracked in stretchSessions
 }
 
 export type ProgressionType = 'dumbbell' | 'legPress' | 'rdl' | 'cable' | 'bodyweight' | 'timed'

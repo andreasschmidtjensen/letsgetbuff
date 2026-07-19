@@ -19,6 +19,14 @@ describe('user-added activities (schema v4)', () => {
     expect(reducer(s2, { type: 'REMOVE_ACTIVITY', date: '2026-07-18', index: 0 })).toBe(s2)
   })
 
+  it('home workout entries (issue #1) log and survive an upgrade round-trip', () => {
+    const s1 = reducer(EMPTY_STATE, { type: 'ADD_ACTIVITY', date: '2026-07-19', activity: { type: 'home', minutes: 13 } })
+    expect(s1.activities['2026-07-19']).toEqual([{ type: 'home', minutes: 13 }])
+    // Export → import: a current-version blob with home entries passes upgrade untouched.
+    const out = upgrade(JSON.parse(JSON.stringify(s1)))!
+    expect(out.activities['2026-07-19']).toEqual([{ type: 'home', minutes: 13 }])
+  })
+
   it('a v3 blob without activities migrates to v4 with an empty map', () => {
     const v3 = {
       schemaVersion: 3, startDate: '2026-06-01', skippedWeeks: [], sessions: {},
