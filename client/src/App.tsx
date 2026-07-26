@@ -14,6 +14,7 @@ import LoginView from './views/LoginView'
 import HistoryView from './views/HistoryView'
 import TestModeBanner from './components/TestModeBanner'
 import ErrorBoundary from './components/ErrorBoundary'
+import BugReportModal from './components/BugReportModal'
 import './app.css'
 
 const TABS: { id: Tab; label: string }[] = [
@@ -79,6 +80,7 @@ function HeaderVersion() {
 
 function AppInner({ username, level, onLogout }: { username: string; level: Privilege; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('home')
+  const [bugReportOpen, setBugReportOpen] = useState(false)
   const { einkMode, setEinkMode } = useEinkMode()
 
   return (
@@ -98,8 +100,23 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
         >
           {einkMode ? '● Colour' : '◐ E-ink'}
         </button>
+        <button
+          className="theme-toggle"
+          style={{ marginLeft: 8 }}
+          onClick={() => setBugReportOpen(true)}
+          title="Report a bug"
+          aria-label="Report a bug"
+        >
+          🐛
+        </button>
         <span className="header-user">{username}</span>
       </header>
+      {bugReportOpen && (
+        <BugReportModal
+          onClose={() => setBugReportOpen(false)}
+          onGoToSettings={() => { setBugReportOpen(false); setTab('settings') }}
+        />
+      )}
       <main className="app-main">
         <div className="view-container">
           {tab === 'home'      && <HomeView onNavigate={setTab} />}

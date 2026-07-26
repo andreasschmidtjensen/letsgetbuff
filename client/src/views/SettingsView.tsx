@@ -9,7 +9,6 @@ import { Proposal, ExerciseProposalCard, ProposeExerciseForm } from '../componen
 import ApiKeyCard from '../components/settings/ApiKeyCard'
 import AdminUsersCard from '../components/settings/AdminUsersCard'
 import GithubConnectCard, { GithubStatus } from '../components/settings/GithubConnectCard'
-import BugReportCard from '../components/settings/BugReportCard'
 import GithubClientIdCard from '../components/settings/GithubClientIdCard'
 import { RestTimerCard, TimerSoundCard, TestModeCard } from '../components/settings/preferenceCards'
 
@@ -242,12 +241,8 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
         </div>
       )}
 
-      {/* GitHub bug reporting: connect account + file issues */}
+      {/* GitHub account for bug reporting (the report form is the 🐛 header popup) */}
       <GithubConnectCard status={githubStatus} onChange={setGithubStatus} />
-      <BugReportCard
-        connected={githubStatus ? githubStatus.connected : null}
-        onDisconnected={() => setGithubStatus(s => s ? { ...s, connected: false, githubLogin: null } : s)}
-      />
 
       {/* Admin: API key + GitHub client ID + user access (only rendered for admins) */}
       {level === 'admin' && <ApiKeyCard />}
