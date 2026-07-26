@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import CountdownTimer from '../CountdownTimer'
 import YouTubeEmbed from '../YouTubeEmbed'
 import { parseYouTubeUrl } from '../../lib/youtube'
-import { formatDuration } from './helpers'
+import { formatDuration, WarmupStep } from './helpers'
 
 // Small presentational pieces of the workout floor. RestTimer/ExerciseTimer are
 // thin wrappers over the shared <CountdownTimer> overlay (Phase 20 item 9).
@@ -81,6 +81,56 @@ export function ExerciseTimer({ targetSecs, onComplete, onCancel, audioCtx, onAu
         </div>
       )}
     />
+  )
+}
+
+interface WarmupChecklistProps {
+  steps: WarmupStep[]
+  audioCtx: AudioContext | null
+  onAudioCtxInit: () => AudioContext
+  muted: boolean
+}
+
+// Overview warm-up checklist: the same parsed steps focus mode shows as slides,
+// each startable with the shared countdown overlay — previously the overview
+// only had the warmup as a plain text line, so the timed reverse planks could
+// not be counted down outside focus mode. Done ticks are per visit, like the
+// focus-mode slides; nothing is logged.
+export function WarmupChecklist({ steps, audioCtx, onAudioCtxInit, muted }: WarmupChecklistProps) {
+  const [done, setDone] = useState<boolean[]>(() => steps.map(() => false))
+  const [timingIdx, setTimingIdx] = useState<number | null>(null)
+
+  const markDone = (i: number) => setDone(d => d.map((v, j) => (j === i ? true : v)))
+
+  return (
+    <div className="card mb-12">
+      {timingIdx !== null && (
+        <ExerciseTimer
+          targetSecs={steps[timingIdx].seconds}
+          onComplete={() => { markDone(timingIdx); setTimingIdx(null) }}
+          onCancel={() => setTimingIdx(null)}
+          audioCtx={audioCtx}
+          onAudioCtxInit={onAudioCtxInit}
+          muted={muted}
+        />
+      )}
+      <div className="card-title">Warm-up</div>
+      {steps.map((s, i) => (
+        <div key={i} className="row gap-8" style={{ alignItems: 'center', padding: '3px 0' }}>
+          <span style={{ fontSize: 13, color: done[i] ? 'var(--green)' : undefined }}>
+            {s.label}{done[i] ? ' ✓' : ''}
+          </span>
+          <button
+            className="btn btn-secondary btn-sm"
+            style={{ marginLeft: 'auto', flexShrink: 0 }}
+            onClick={() => setTimingIdx(i)}
+            aria-label={`Start ${formatDuration(s.seconds)} timer: ${s.label}`}
+          >
+            ▶ {formatDuration(s.seconds)}
+          </button>
+        </div>
+      ))}
+    </div>
   )
 }
 

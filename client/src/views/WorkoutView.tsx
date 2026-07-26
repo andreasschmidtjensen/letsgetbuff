@@ -21,7 +21,7 @@ import { preloadTimerSounds } from '../lib/sounds'
 import StartSessionModal from '../components/StartSessionModal'
 import { START_WARMUP_FLAG } from './StretchView'
 import { parseWarmup } from '../components/workout/helpers'
-import { SessionTimer } from '../components/workout/timers'
+import { SessionTimer, WarmupChecklist } from '../components/workout/timers'
 import { SortableExerciseLogger } from '../components/workout/ExerciseLogger'
 import FocusMode from '../components/workout/FocusMode'
 import { computeProgramWeek, scheduleFor, todayDayName } from '@letsgetbuff/shared'
@@ -416,11 +416,21 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
           Key rule: No loaded spinal flexion. Knees track over toes.
         </div>
 
-        <div className="card mb-12">
-          <span className="muted" style={{ fontSize: 13 }}>
-            Warmup: {getWorkout(workoutType)?.warmup}
-          </span>
-        </div>
+        {focusWarmup ? (
+          <WarmupChecklist
+            key={`${dateStr}-${workoutType}`}
+            steps={focusWarmup}
+            audioCtx={audioCtxRef.current}
+            onAudioCtxInit={initAudio}
+            muted={muted}
+          />
+        ) : (
+          <div className="card mb-12">
+            <span className="muted" style={{ fontSize: 13 }}>
+              Warmup: {getWorkout(workoutType)?.warmup}
+            </span>
+          </div>
+        )}
 
         {repBandFor(programWeek) > repBandFor(programWeek - 1) && programWeek > 1 && (
           <div className="card mb-12" style={{ borderColor: 'var(--accent)' }} role="note">
