@@ -267,6 +267,11 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
           <button className="btn btn-secondary w-full mt-8" onClick={startHomeWorkout}>
             Home workout ~{homeWorkoutMinutes()} min{homeDoneToday ? ' ✓' : ''}
           </button>
+          {!isTodayGym && nextGym && (
+            <button className="btn btn-secondary w-full mt-8" onClick={() => onNavigate('workout')}>
+              Gym workout (next: {nextGym.workout}) →
+            </button>
+          )}
         </div>
 
         {nextGym && nextGym.dateKey !== todayStr && (
@@ -414,6 +419,16 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
         <div style={{ marginTop: 10 }}>
           <AddActivity date={todayStr} onNavigate={onNavigate} />
         </div>
+        {!(todayActivity === 'gym-a' || todayActivity === 'gym-b') && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <div className="row gap-8" style={{ alignItems: 'center' }}>
+              <span style={{ fontSize: 14, color: nextGym?.workout === 'B' ? 'var(--blue)' : 'var(--accent)' }}>
+                Gym workout{nextGym ? ` · next: ${nextGym.workout}` : ''}
+              </span>
+              <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => onNavigate('workout')}>Open &rarr;</button>
+            </div>
+          </div>
+        )}
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
           <div className="row gap-8" style={{ alignItems: 'center' }}>
             <span style={{ fontSize: 14, color: 'var(--green)' }}>Stretch (optional)</span>
@@ -425,7 +440,8 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
           <div className="row gap-8" style={{ alignItems: 'center' }}>
             <span style={{ fontSize: 14, color: 'var(--accent)' }}>Home workout · ~{homeWorkoutMinutes()} min, no equipment</span>
             {homeDoneToday && <span className="badge badge-green">Done</span>}
-            <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={startHomeWorkout}>Start &rarr;</button>
+            <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => onNavigate('hometraining')}>Program &rarr;</button>
+            <button className="btn btn-secondary btn-sm" onClick={startHomeWorkout}>Start &rarr;</button>
           </div>
         </div>
       </div>

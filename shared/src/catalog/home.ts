@@ -11,6 +11,7 @@ export interface HomeExercise {
   id: string
   name: string
   cues: string[]
+  videoId: string // 11-char YouTube id — form demo shown on the Home training tab
 }
 
 export interface HomeWorkoutPlan {
@@ -33,31 +34,37 @@ export const HOME_WORKOUT: HomeWorkoutPlan = {
       id: 'bw-squat',
       name: 'Bodyweight squats',
       cues: ['Feet shoulder-width, toes slightly out', 'Sit back and down, chest up', 'Drive through the whole foot'],
+      videoId: 'ZLJBfYF_oO0',
     },
     {
       id: 'push-up',
       name: 'Push-ups',
       cues: ['Hands under shoulders, body in one line', 'Lower with control, elbows ~45°', 'On knees or against a table to scale down'],
+      videoId: 'WDIpL0pjun0',
     },
     {
       id: 'reverse-lunge',
       name: 'Reverse lunges',
       cues: ['Step back, drop the back knee toward the floor', 'Front shin vertical, torso tall', 'Alternate legs each rep'],
+      videoId: 'u_zSfK5ZFU4',
     },
     {
       id: 'plank',
       name: 'Plank',
       cues: ['Forearms down, body in one straight line', 'Squeeze glutes, brace the belly', 'Breathe — don\'t hold your breath'],
+      videoId: 'mwlp75MS6Rg',
     },
     {
       id: 'glute-bridge',
       name: 'Glute bridges',
       cues: ['On your back, heels close to hips', 'Drive hips up, squeeze at the top', 'Ribs down — don\'t arch the lower back'],
+      videoId: '8bbE64NuDTU',
     },
     {
       id: 'mountain-climber',
       name: 'Mountain climbers',
       cues: ['Push-up position, drive knees to chest', 'Keep hips level, steady rhythm', 'Slow down rather than lose form'],
+      videoId: 'cnyTQDSE884',
     },
   ],
 }

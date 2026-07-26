@@ -36,11 +36,11 @@ const REST_SECS_DEFAULT = 90
 
 type GymWorkout = 'A' | 'B'
 
-const WORKOUT_OPTIONS: { value: Session['workout']; label: string }[] = [
+// Issue #3: this screen is gym-only — just the two gym trainings. Runs, rides,
+// rest days and home workouts are started/logged from the Home tab.
+const WORKOUT_OPTIONS: { value: GymWorkout; label: string }[] = [
   { value: 'A', label: 'Workout A' },
   { value: 'B', label: 'Workout B' },
-  { value: 'bike', label: 'Bike / Run' },
-  { value: 'rest', label: 'Rest' },
 ]
 
 export default function WorkoutView({ username, level, onNavigate }: { username: string; level?: Privilege; onNavigate?: (tab: Tab) => void }) {
@@ -91,39 +91,44 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
     return audioCtxRef.current
   }, [])
 
-  const existingSession = state.sessions[dateStr]
-
-  function scheduledWorkout(date: string): Session['workout'] {
-    if (!state.startDate) return 'rest'
-    const d = keyToDate(date)
-    const week = computeProgramWeek(state.startDate, state.skippedWeeks, d)
-    const sched = scheduleFor(week)
-    const day = todayDayName(d)
-    const act = sched[day]
-    if (act === 'gym-a') return 'A'
-    if (act === 'gym-b') return 'B'
-    if (act === 'bike' || act === 'run') return 'bike'
-    return 'rest'
+  // Gym workout for a date: the one scheduled that day, else the next scheduled
+  // gym workout within two weeks (so a non-gym day defaults sensibly), else A.
+  function scheduledWorkout(date: string): GymWorkout {
+    if (!state.startDate) return 'A'
+    for (let i = 0; i <= 14; i++) {
+      const d = keyToDate(date)
+      d.setDate(d.getDate() + i)
+      const week = computeProgramWeek(state.startDate, state.skippedWeeks, d)
+      const act = scheduleFor(week)[todayDayName(d)]
+      if (act === 'gym-a') return 'A'
+      if (act === 'gym-b') return 'B'
+    }
+    return 'A'
   }
 
-  const defaultWorkout = existingSession?.workout ?? scheduledWorkout(dateStr)
-  const [workoutType, setWorkoutType] = useState<Session['workout']>(defaultWorkout)
+  // Historical sessions may be bike/rest (logged before this screen went
+  // gym-only) — those don't preselect anything here.
+  function gymDefault(date: string): GymWorkout {
+    const existing = state.sessions[date]
+    return existing?.workout === 'A' || existing?.workout === 'B'
+      ? existing.workout
+      : scheduledWorkout(date)
+  }
+
+  const [workoutType, setWorkoutType] = useState<GymWorkout>(() => gymDefault(dateStr))
 
   const handleDateChange = (newDate: string) => {
     setDateStr(newDate)
     setFocusIndex(null)
-    const existing = state.sessions[newDate]
-    setWorkoutType(existing?.workout ?? scheduledWorkout(newDate))
+    setWorkoutType(gymDefault(newDate))
   }
-
-  const isGym = workoutType === 'A' || workoutType === 'B'
   const session = state.sessions[dateStr]
   const programWeek = state.startDate
     ? computeProgramWeek(state.startDate, state.skippedWeeks, keyToDate(dateStr))
     : 1
   const restDefaultSecs = restPrefSecs ?? (repBandFor(programWeek) === 3 ? 150 : REST_SECS_DEFAULT)
 
-  const planExercises = isGym ? getWorkoutExercises(workoutType as GymWorkout, programWeek) : []
+  const planExercises = getWorkoutExercises(workoutType, programWeek)
   const planOrder = planExercises.map(e => e.id)
 
   // ── Phase 13: session resolution (alone / with-partner / resume) ──────────
@@ -160,7 +165,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
   // (the server 403s POST /api/session), so they skip resolution entirely and just
   // observe the plan order read-only.
   useEffect(() => {
-    if (!isGym || readOnly) {
+    if (readOnly) {
       setSessionId(null); setSessionInfo(null); setShowStartModal(false)
       return
     }
@@ -189,7 +194,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
       .catch(() => { if (!cancelled) createSession('solo') })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateStr, workoutType, isGym, readOnly, resolveNonce])
+  }, [dateStr, workoutType, readOnly, resolveNonce])
 
   const endCurrentSession = useCallback(async () => {
     if (sessionId == null) return
@@ -230,7 +235,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
     date: dateStr,
     workoutType,
     username,
-    enabled: isGym && sessionId != null,
+    enabled: sessionId != null,
     sessionId,
   })
 
@@ -240,7 +245,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
     .filter((e): e is ExerciseDef => e !== undefined)
 
   // The workout's cardio warm-up, shown as the first timed slide in focus mode.
-  const focusWarmup = isGym ? parseWarmup(getWorkout(workoutType as GymWorkout)?.warmup) : null
+  const focusWarmup = parseWarmup(getWorkout(workoutType)?.warmup)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -275,7 +280,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
 
   return (
     <>
-      {showStartModal && isGym && (
+      {showStartModal && (
         <StartSessionModal
           partner={partnerCandidate ? { username: partnerCandidate } : null}
           onChoose={(mode, partnerUsername) => createSession(mode, partnerUsername)}
@@ -283,7 +288,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
         />
       )}
 
-      {focusIndex !== null && isGym && (
+      {focusIndex !== null && (
         <FocusMode
           exercises={exercises}
           startIndex={focusIndex}
@@ -341,161 +346,144 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
           </div>
         </div>
 
-        {isGym && (
-          <>
-            <div className="row gap-8 mb-8" style={{ flexWrap: 'wrap' }}>
-              <h2 style={{ margin: 0 }}>
-                Workout {workoutType} - {getWorkout(workoutType as GymWorkout)?.name}
-              </h2>
-              {session?.done && <span className="badge badge-green">Done</span>}
-              {sessionStartedAt && <SessionTimer startedAt={sessionStartedAt} />}
-              <button
-                className="btn btn-secondary btn-sm"
-                style={{ marginLeft: 'auto' }}
-                onClick={toggleMute}
-                aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}
-                title={muted ? 'Unmute sounds' : 'Mute sounds'}
-              >
-                {muted ? '🔇' : '🔔'}
-              </button>
-            </div>
+        <div className="row gap-8 mb-8" style={{ flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0 }}>
+            Workout {workoutType} - {getWorkout(workoutType)?.name}
+          </h2>
+          {session?.done && <span className="badge badge-green">Done</span>}
+          {sessionStartedAt && <SessionTimer startedAt={sessionStartedAt} />}
+          <button
+            className="btn btn-secondary btn-sm"
+            style={{ marginLeft: 'auto' }}
+            onClick={toggleMute}
+            aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}
+            title={muted ? 'Unmute sounds' : 'Mute sounds'}
+          >
+            {muted ? '🔇' : '🔔'}
+          </button>
+        </div>
 
-            {/* Session bar: mode + end-session affordance (Phase 13) + proxy toggle (Phase 16) */}
-            {sessionId != null && (
-              <div className="row gap-8 mb-8" style={{ alignItems: 'center', fontSize: 12, flexWrap: 'wrap' }}>
-                <span className="muted">
-                  {sessionInfo?.mode === 'shared'
-                    ? `👥 Shared${partnerNames.length ? ` with ${partnerNames.join(', ')}` : ''}`
-                    : '🏋️ Solo'}
-                </span>
-                {/* Phase 16: proxy toggle — only in shared sessions */}
-                {sessionInfo?.mode === 'shared' && partnerNames.length > 0 && (
-                  <div className="row gap-4" style={{ alignItems: 'center' }}>
-                    <span className="muted">Log for:</span>
-                    <button
-                      className={`btn btn-sm ${!proxyFor ? 'btn-primary' : 'btn-secondary'}`}
-                      onClick={() => setProxyFor(null)}
-                      aria-pressed={!proxyFor}
-                    >
-                      Me
-                    </button>
-                    {partnerNames.map(p => (
-                      <button
-                        key={p}
-                        className={`btn btn-sm ${proxyFor === p ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => setProxyFor(p)}
-                        aria-pressed={proxyFor === p}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                )}
+        {/* Session bar: mode + end-session affordance (Phase 13) + proxy toggle (Phase 16) */}
+        {sessionId != null && (
+          <div className="row gap-8 mb-8" style={{ alignItems: 'center', fontSize: 12, flexWrap: 'wrap' }}>
+            <span className="muted">
+              {sessionInfo?.mode === 'shared'
+                ? `👥 Shared${partnerNames.length ? ` with ${partnerNames.join(', ')}` : ''}`
+                : '🏋️ Solo'}
+            </span>
+            {/* Phase 16: proxy toggle — only in shared sessions */}
+            {sessionInfo?.mode === 'shared' && partnerNames.length > 0 && (
+              <div className="row gap-4" style={{ alignItems: 'center' }}>
+                <span className="muted">Log for:</span>
                 <button
-                  className="btn btn-secondary btn-sm"
-                  style={{ marginLeft: 'auto' }}
-                  onClick={endCurrentSession}
-                  aria-label="End session"
+                  className={`btn btn-sm ${!proxyFor ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setProxyFor(null)}
+                  aria-pressed={!proxyFor}
                 >
-                  End
+                  Me
                 </button>
-              </div>
-            )}
-            {proxyFor && (
-              <div className="card mb-8" role="note" style={{ borderColor: 'var(--accent)', padding: '6px 10px' }}>
-                <span style={{ fontSize: 12, color: 'var(--accent)' }}>
-                  Logging for <strong>{proxyFor}</strong> — your own data is unaffected.
-                </span>
-              </div>
-            )}
-
-            <div className="safety-banner mb-12" role="note">
-              Key rule: No loaded spinal flexion. Knees track over toes.
-            </div>
-
-            <div className="card mb-12">
-              <span className="muted" style={{ fontSize: 13 }}>
-                Warmup: {getWorkout(workoutType as GymWorkout)?.warmup}
-              </span>
-            </div>
-
-            {repBandFor(programWeek) > repBandFor(programWeek - 1) && programWeek > 1 && (
-              <div className="card mb-12" style={{ borderColor: 'var(--accent)' }} role="note">
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>New rep phase</div>
-                <div className="muted" style={{ fontSize: 12 }}>Rep range dropped. Consider increasing weight ~10%.</div>
-              </div>
-            )}
-
-            {exercises.length > 0 && (
-              <button
-                className="btn btn-primary btn-start-focus"
-                onClick={() => setFocusIndex(0)}
-                aria-label="Start focus mode"
-              >
-                ▶ Start focus mode
-              </button>
-            )}
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 11, color: wsLabel.color }}>
-              <span>{wsLabel.symbol}</span>
-              {partnerPresence.size > 0 && (
-                <span style={{ color: 'var(--accent)', marginLeft: 4 }}>
-                  {[...partnerPresence.keys()].join(', ')} online
-                </span>
-              )}
-              <span className="muted" style={{ marginLeft: 'auto', fontSize: 10 }}>Drag to reorder</span>
-            </div>
-
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={liveOrder} strategy={verticalListSortingStrategy}>
-                {exercises.map((ex, i) => (
-                  <SortableExerciseLogger
-                    key={`${dateStr}-${ex.id}`}
-                    exercise={ex}
-                    dateStr={dateStr}
-                    programWeek={programWeek}
-                    onStartFocus={() => { setFocusIndex(focusWarmup ? i + focusWarmup.length : i); sendPresence(ex.id) }}
-                    audioCtx={audioCtxRef.current}
-                    onAudioCtxInit={initAudio}
-                    partnerHere={[...partnerPresence.entries()].find(([, eid]) => eid === ex.id)?.[0]}
-                    readOnly={readOnly}
-                    muted={muted}
-                    restDefaultSecs={restDefaultSecs}
-                    proxyFor={proxyFor}
-                    sessionId={sessionId}
-                    workoutType={workoutType}
-                  />
+                {partnerNames.map(p => (
+                  <button
+                    key={p}
+                    className={`btn btn-sm ${proxyFor === p ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setProxyFor(p)}
+                    aria-pressed={proxyFor === p}
+                  >
+                    {p}
+                  </button>
                 ))}
-              </SortableContext>
-            </DndContext>
-          </>
+              </div>
+            )}
+            <button
+              className="btn btn-secondary btn-sm"
+              style={{ marginLeft: 'auto' }}
+              onClick={endCurrentSession}
+              aria-label="End session"
+            >
+              End
+            </button>
+          </div>
         )}
-
-        {!isGym && (
-          <div className="card">
-            <p className="muted" style={{ margin: 0 }}>
-              {workoutType === 'bike' ? 'Bike / Run day - no set logging needed.' : 'Rest day.'}
-            </p>
+        {proxyFor && (
+          <div className="card mb-8" role="note" style={{ borderColor: 'var(--accent)', padding: '6px 10px' }}>
+            <span style={{ fontSize: 12, color: 'var(--accent)' }}>
+              Logging for <strong>{proxyFor}</strong> — your own data is unaffected.
+            </span>
           </div>
         )}
 
+        <div className="safety-banner mb-12" role="note">
+          Key rule: No loaded spinal flexion. Knees track over toes.
+        </div>
+
+        <div className="card mb-12">
+          <span className="muted" style={{ fontSize: 13 }}>
+            Warmup: {getWorkout(workoutType)?.warmup}
+          </span>
+        </div>
+
+        {repBandFor(programWeek) > repBandFor(programWeek - 1) && programWeek > 1 && (
+          <div className="card mb-12" style={{ borderColor: 'var(--accent)' }} role="note">
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>New rep phase</div>
+            <div className="muted" style={{ fontSize: 12 }}>Rep range dropped. Consider increasing weight ~10%.</div>
+          </div>
+        )}
+
+        {exercises.length > 0 && (
+          <button
+            className="btn btn-primary btn-start-focus"
+            onClick={() => setFocusIndex(0)}
+            aria-label="Start focus mode"
+          >
+            ▶ Start focus mode
+          </button>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 11, color: wsLabel.color }}>
+          <span>{wsLabel.symbol}</span>
+          {partnerPresence.size > 0 && (
+            <span style={{ color: 'var(--accent)', marginLeft: 4 }}>
+              {[...partnerPresence.keys()].join(', ')} online
+            </span>
+          )}
+          <span className="muted" style={{ marginLeft: 'auto', fontSize: 10 }}>Drag to reorder</span>
+        </div>
+
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={liveOrder} strategy={verticalListSortingStrategy}>
+            {exercises.map((ex, i) => (
+              <SortableExerciseLogger
+                key={`${dateStr}-${ex.id}`}
+                exercise={ex}
+                dateStr={dateStr}
+                programWeek={programWeek}
+                onStartFocus={() => { setFocusIndex(focusWarmup ? i + focusWarmup.length : i); sendPresence(ex.id) }}
+                audioCtx={audioCtxRef.current}
+                onAudioCtxInit={initAudio}
+                partnerHere={[...partnerPresence.entries()].find(([, eid]) => eid === ex.id)?.[0]}
+                readOnly={readOnly}
+                muted={muted}
+                restDefaultSecs={restDefaultSecs}
+                proxyFor={proxyFor}
+                sessionId={sessionId}
+                workoutType={workoutType}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
+
         {onNavigate && (
           <div className="card mb-12">
-            <div className="card-title">Optional stretch</div>
+            <div className="card-title">Pre-gym warm-up</div>
             <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
-              Mobility &amp; flexibility, logged separately from this workout.
+              A ~5 min flow before lifting. The full stretch program lives on its own tab.
             </p>
-            <div className="row gap-8" style={{ flexWrap: 'wrap' }}>
-              {(workoutType === 'A' || workoutType === 'B') && (
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => { sessionStorage.setItem(START_WARMUP_FLAG, '1'); onNavigate('stretch') }}
-                >
-                  ▶ Start warm-up flow (~5 min)
-                </button>
-              )}
-              <button className="btn btn-secondary btn-sm" onClick={() => onNavigate('stretch')}>Open stretch &rarr;</button>
-            </div>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => { sessionStorage.setItem(START_WARMUP_FLAG, '1'); onNavigate('stretch') }}
+            >
+              ▶ Start warm-up flow (~5 min)
+            </button>
           </div>
         )}
 
