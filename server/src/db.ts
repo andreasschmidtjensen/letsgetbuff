@@ -21,7 +21,7 @@ export type Db = DatabaseSync
 
 // ---- Migration ladder -------------------------------------------------------
 
-const CURRENT_DB_VERSION = 7
+const CURRENT_DB_VERSION = 8
 
 type Migration = (db: DatabaseSync) => void
 
@@ -182,6 +182,18 @@ const MIGRATIONS: Record<number, Migration> = {
     } catch (err) {
       console.error('[db] Migration 7: could not append new exercises', err)
     }
+  },
+  8: (db) => {
+    // GitHub bug reporting: per-user OAuth device-flow token (scope public_repo).
+    // github_login is display-only and may be null if GET /user failed at connect.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS github_tokens (
+        user_id      INTEGER PRIMARY KEY REFERENCES users(id),
+        token        TEXT NOT NULL,
+        github_login TEXT,
+        created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `)
   },
 }
 

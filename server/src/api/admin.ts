@@ -1,17 +1,22 @@
 /**
- * Admin-only routes: user privilege management (Phase 11) and the Anthropic
- * API key store (Phase 18). All guarded by requirePrivilege('admin').
+ * Admin-only routes: user privilege management (Phase 11), the Anthropic
+ * API key store (Phase 18) and the GitHub OAuth client-id store (bug
+ * reporting). All guarded by requirePrivilege('admin').
  *
  *   GET    /api/admin/users
  *   PUT    /api/admin/users/:username/level
  *   GET    /api/admin/config/ai-key
  *   PUT    /api/admin/config/ai-key
  *   DELETE /api/admin/config/ai-key
+ *   GET    /api/admin/config/github-client-id
+ *   PUT    /api/admin/config/github-client-id
+ *   DELETE /api/admin/config/github-client-id
  */
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import type { Db } from '../db.js'
 import { isAiConfigured, getApiKey } from '../claude.js'
+import { getGithubClientId } from '../github.js'
 import { requirePrivilege, type Privilege } from '../auth.js'
 
 const VALID_LEVELS: Privilege[] = ['none', 'viewer', 'user', 'admin']
@@ -130,6 +135,54 @@ export function registerAdminRoutes(app: FastifyInstance, db: Db): void {
     async (_req: FastifyRequest, reply: FastifyReply) => {
       db.prepare("DELETE FROM server_config WHERE key = 'anthropic_api_key'").run()
       return reply.send({ ok: true, configured: Boolean(getApiKey(db)) })
+    },
+  )
+
+  // ── GitHub OAuth client ID (bug reporting) ──────────────────────────────────
+  // Unlike the AI key, a client ID is public by nature (it appears in the
+  // device-flow consent URL), so the GET returns the stored value.
+
+  app.get(
+    '/api/admin/config/github-client-id',
+    { preHandler: requirePrivilege('admin') },
+    async (_req: FastifyRequest, reply: FastifyReply) => {
+      const clientId = getGithubClientId(db)
+      return reply.send({ configured: Boolean(clientId), clientId })
+    },
+  )
+
+  // PUT /api/admin/config/github-client-id — upsert into server_config
+  app.put<{ Body: { clientId: string } }>(
+    '/api/admin/config/github-client-id',
+    {
+      preHandler: requirePrivilege('admin'),
+      schema: {
+        body: {
+          type: 'object',
+          required: ['clientId'],
+          properties: { clientId: { type: 'string', minLength: 1 } },
+        },
+      },
+    },
+    async (req: FastifyRequest<{ Body: { clientId: string } }>, reply: FastifyReply) => {
+      const { clientId } = req.body
+      if (!clientId?.trim()) return reply.code(400).send({ error: 'clientId is required' })
+      const now = new Date().toISOString()
+      db.prepare(`
+        INSERT INTO server_config (key, value, updated_at)
+        VALUES ('github_client_id', ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+      `).run(clientId.trim(), now)
+      return reply.send({ ok: true })
+    },
+  )
+
+  app.delete(
+    '/api/admin/config/github-client-id',
+    { preHandler: requirePrivilege('admin') },
+    async (_req: FastifyRequest, reply: FastifyReply) => {
+      db.prepare("DELETE FROM server_config WHERE key = 'github_client_id'").run()
+      return reply.send({ ok: true })
     },
   )
 }

@@ -8,6 +8,9 @@ import SyncBadge from '../components/settings/SyncBadge'
 import { Proposal, ExerciseProposalCard, ProposeExerciseForm } from '../components/settings/proposals'
 import ApiKeyCard from '../components/settings/ApiKeyCard'
 import AdminUsersCard from '../components/settings/AdminUsersCard'
+import GithubConnectCard, { GithubStatus } from '../components/settings/GithubConnectCard'
+import BugReportCard from '../components/settings/BugReportCard'
+import GithubClientIdCard from '../components/settings/GithubClientIdCard'
 import { RestTimerCard, TimerSoundCard, TestModeCard } from '../components/settings/preferenceCards'
 
 interface Props {
@@ -36,6 +39,9 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
   // Phase 10: null = unknown (still checking), true/false = server AI key status
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null)
 
+  // GitHub bug reporting: single status fetch shared by connect + report cards
+  const [githubStatus, setGithubStatus] = useState<GithubStatus | null>(null)
+
   useEffect(() => {
     fetch('/api/plan/proposals?status=pending', { credentials: 'include' })
       .then(r => r.json())
@@ -45,6 +51,10 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
       .then(r => r.json())
       .then((d: { configured: boolean }) => setAiConfigured(Boolean(d.configured)))
       .catch(() => setAiConfigured(false))
+    fetch('/api/github/status', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((d: GithubStatus) => setGithubStatus(d))
+      .catch(() => setGithubStatus({ configured: false, connected: false, githubLogin: null }))
   }, [])
 
   const handleApprove = async (id: number) => {
@@ -232,8 +242,16 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
         </div>
       )}
 
-      {/* Admin: API key + user access (only rendered for admins) */}
+      {/* GitHub bug reporting: connect account + file issues */}
+      <GithubConnectCard status={githubStatus} onChange={setGithubStatus} />
+      <BugReportCard
+        connected={githubStatus ? githubStatus.connected : null}
+        onDisconnected={() => setGithubStatus(s => s ? { ...s, connected: false, githubLogin: null } : s)}
+      />
+
+      {/* Admin: API key + GitHub client ID + user access (only rendered for admins) */}
       {level === 'admin' && <ApiKeyCard />}
+      {level === 'admin' && <GithubClientIdCard />}
       {level === 'admin' && <AdminUsersCard />}
 
       {/* Schema info */}
