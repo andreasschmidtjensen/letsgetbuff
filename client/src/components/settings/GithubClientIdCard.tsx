@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react'
 
+interface Props {
+  // Lets SettingsView flip the connect/report cards without a page reload.
+  onConfiguredChange?: (configured: boolean) => void
+}
+
 // Admin-only GitHub OAuth App client-id card (bug reporting). Unlike the AI
 // key, a client ID is public, so the stored value is shown for verification.
-export default function GithubClientIdCard() {
+export default function GithubClientIdCard({ onConfiguredChange }: Props = {}) {
   const [configured, setConfigured] = useState<boolean | null>(null)
   const [idInput, setIdInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -35,6 +40,7 @@ export default function GithubClientIdCard() {
       }
       setConfigured(true)
       setMsg('✓ Client ID saved')
+      onConfiguredChange?.(true)
     } catch (err) {
       setMsg(`✗ ${String(err)}`)
     } finally {
@@ -51,6 +57,7 @@ export default function GithubClientIdCard() {
       setConfigured(false)
       setIdInput('')
       setMsg('✓ Client ID removed')
+      onConfiguredChange?.(false)
     } catch (err) {
       setMsg(`✗ ${String(err)}`)
     } finally {

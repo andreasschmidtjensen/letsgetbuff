@@ -251,7 +251,12 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
 
       {/* Admin: API key + GitHub client ID + user access (only rendered for admins) */}
       {level === 'admin' && <ApiKeyCard />}
-      {level === 'admin' && <GithubClientIdCard />}
+      {level === 'admin' && (
+        <GithubClientIdCard
+          onConfiguredChange={configured => setGithubStatus(s =>
+            s ? { ...s, configured } : { configured, connected: false, githubLogin: null })}
+        />
+      )}
       {level === 'admin' && <AdminUsersCard />}
 
       {/* Schema info */}
