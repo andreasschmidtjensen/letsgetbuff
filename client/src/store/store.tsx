@@ -11,6 +11,7 @@ import {
   flushProxyQueue,
 } from './persistence'
 import { useTestMode } from './testMode'
+import { isGuestMode, guestSeedState } from './guest'
 
 // Fetch the shared plan from the server and inject it into the catalog module.
 // Falls back silently — the catalog's DEFAULT_PLAN remains active if this fails.
@@ -27,7 +28,7 @@ async function loadServerPlan(): Promise<void> {
 
 // ── Sync status ───────────────────────────────────────────────────────────────
 
-export type SyncStatus = 'loading' | 'synced' | 'syncing' | 'offline' | 'error'
+export type SyncStatus = 'loading' | 'synced' | 'syncing' | 'offline' | 'error' | 'guest'
 
 interface StoreCtx {
   state: AppState
@@ -50,9 +51,18 @@ interface StoreProviderProps {
 }
 
 export function StoreProvider({ children, username }: StoreProviderProps) {
+  // Guest mode: a throwaway in-memory demo. Seeded state (never the signed-in
+  // user's cache), no server load, no write-back, no localStorage. Read once —
+  // exiting guest mode unmounts this provider.
+  const guest = useRef(isGuestMode()).current
+
   // Start from local cache for instant render; server state overwrites on mount
-  const [state, dispatch] = useReducer(reducer, undefined, () => loadLocalState() ?? { ...EMPTY_STATE })
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading')
+  const [state, dispatch] = useReducer(
+    reducer,
+    undefined,
+    () => (guest ? guestSeedState() : loadLocalState() ?? { ...EMPTY_STATE }),
+  )
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(guest ? 'guest' : 'loading')
   const [pendingCount, setPendingCount] = useState(0)
 
   // Test mode: when on, suppress ALL persistence (server + local cache). Kept in a
@@ -117,20 +127,23 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
       }
     }
 
-    loadFromServer()
+    // Guests have no account: they keep the seeded demo state and only pull the
+    // shared plan (GET /api/plan is public) so they see the real trainings.
+    if (!guest) loadFromServer()
     // Load server plan in parallel — no need to block state restore on this
     loadServerPlan()
     // Send any proxy-log entries queued while offline in a previous visit
-    if (!testModeRef.current) flushProxyQueue().catch(() => {})
+    if (!testModeRef.current && !guest) flushProxyQueue().catch(() => {})
     return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username])
 
   // ── 2. Write-through: debounced PUT on every state change ─────────────────
   useEffect(() => {
     // Don't write-back during initial load
     if (syncStatus === 'loading') return
-    // Test mode: in-memory only — never touch the server or the local cache.
-    if (testModeRef.current) return
+    // Guest / test mode: in-memory only — never touch the server or the cache.
+    if (guest || testModeRef.current) return
 
     dirtyAfterLoad.current = true
     setPendingCount(1)
@@ -161,6 +174,7 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
 
   // ── 3. Flush on reconnect / periodic retry ────────────────────────────────
   useEffect(() => {
+    if (guest) return   // nothing to flush, nothing to retry
     async function retry() {
       // Queued proxy-log entries (sets logged for the partner) retry on the
       // same cadence — they live outside AppState, so pendingCount doesn't
@@ -188,7 +202,7 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
 
   // ── 4. Flush on tab close ─────────────────────────────────────────────────
   useEffect(() => {
-    const flush = () => { if (!testModeRef.current) saveLocalState(latest.current) }
+    const flush = () => { if (!guest && !testModeRef.current) saveLocalState(latest.current) }
     window.addEventListener('beforeunload', flush)
     return () => {
       window.removeEventListener('beforeunload', flush)
@@ -199,6 +213,7 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
   // ── 5. Leaving test mode → discard sandbox edits, restore real data ───────
   const prevTestMode = useRef(testMode)
   useEffect(() => {
+    if (guest) return   // no real data to restore — the whole session is a sandbox
     if (prevTestMode.current && !testMode) {
       // The local cache was frozen during test mode, so it still holds real data.
       const cached = loadLocalState()

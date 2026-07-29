@@ -8,9 +8,11 @@ import type { Privilege } from '@letsgetbuff/shared'
 
 interface Props {
   onLogin: (username: string, level: Privilege) => void
+  /** Enter the sign-in-free demo (see store/guest.ts). */
+  onGuest: () => void
 }
 
-export default function LoginView({ onLogin }: Props) {
+export default function LoginView({ onLogin, onGuest }: Props) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -107,6 +109,30 @@ export default function LoginView({ onLogin }: Props) {
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
+
+      {/* Guest: full access to every training, nothing is saved */}
+      <div style={{ width: '100%', maxWidth: '320px', marginTop: '20px', textAlign: 'center' }}>
+        <button
+          type="button"
+          onClick={onGuest}
+          style={{
+            width: '100%',
+            padding: '12px',
+            background: 'transparent',
+            color: 'var(--text)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontWeight: 600,
+            fontSize: '0.95rem',
+            cursor: 'pointer',
+          }}
+        >
+          Continue as guest
+        </button>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '8px' }}>
+          Browse and try every training. Nothing is saved.
+        </p>
+      </div>
 
       <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '24px', textAlign: 'center' }}>
         Manage accounts in Calibre-Web Automated

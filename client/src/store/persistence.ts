@@ -1,4 +1,5 @@
 import { AppState, todayKey, migrate, upgrade } from '@letsgetbuff/shared'
+import { isGuestMode } from './guest'
 
 // The migration ladder (`migrate`/`upgrade`) now lives in @letsgetbuff/shared so
 // the server runs the identical steps on every read/write path — see
@@ -27,6 +28,9 @@ export function loadLocalState(): AppState | null {
 }
 
 export function saveLocalState(state: AppState): void {
+  // Guest mode: never touch the cache — it belongs to the signed-in account and
+  // a guest session must leave no trace.
+  if (isGuestMode()) return
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
@@ -49,6 +53,9 @@ export async function fetchServerState(): Promise<ServerStateResponse> {
 }
 
 export async function putServerState(state: AppState): Promise<{ ok: boolean; updatedAt: string }> {
+  // Guest mode has no account to write to. Callers are already gated; this is
+  // the backstop so a missed guard can never persist a guest's data.
+  if (isGuestMode()) throw new Error('Guest mode: server writes are disabled')
   const res = await fetch('/api/state', {
     method: 'PUT',
     credentials: 'include',
@@ -114,6 +121,7 @@ async function attemptProxyLog(payload: ProxyLogPayload): Promise<boolean> {
 // Send one proxy entry; on network/server failure queue it for the retry loop.
 // Resolves true only when the server accepted the write.
 export async function sendProxyLog(payload: ProxyLogPayload): Promise<boolean> {
+  if (isGuestMode()) return false   // guests never join shared sessions
   try {
     return await attemptProxyLog(payload)
   } catch {
@@ -125,6 +133,7 @@ export async function sendProxyLog(payload: ProxyLogPayload): Promise<boolean> {
 // Retry everything queued; keeps whatever still fails. Returns the number of
 // entries remaining in the queue.
 export async function flushProxyQueue(): Promise<number> {
+  if (isGuestMode()) return 0
   const queue = readProxyQueue()
   if (queue.length === 0) return 0
   const remaining: ProxyLogPayload[] = []
@@ -146,6 +155,7 @@ export function isMigrated(username: string): boolean {
 }
 
 export function markMigrated(username: string): void {
+  if (isGuestMode()) return
   localStorage.setItem(`letsgetbuff-migrated-${username}`, '1')
 }
 

@@ -271,7 +271,11 @@ export function requirePrivilege(min: Privilege) {
 
 // ── Auth preHandler (guards /api/* except public routes) ───────────────────
 
-const PUBLIC_ROUTES = new Set(['/api/login', '/api/health'])
+// `/api/plan` is read-only and holds no user data — guest mode (login-free demo
+// access to the trainings) needs it to show the real shared plan rather than the
+// bundled seed. Every other plan route (proposals, propose, approve, reject)
+// stays behind the guard.
+const PUBLIC_ROUTES = new Set(['/api/login', '/api/health', '/api/plan'])
 
 /**
  * Current privilege straight from buff.db — the authoritative source. The JWT

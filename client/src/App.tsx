@@ -13,6 +13,8 @@ import SettingsView from './views/SettingsView'
 import LoginView from './views/LoginView'
 import HistoryView from './views/HistoryView'
 import TestModeBanner from './components/TestModeBanner'
+import GuestBanner from './components/GuestBanner'
+import { isGuestMode, setGuestMode, GUEST_USERNAME } from './store/guest'
 import ErrorBoundary from './components/ErrorBoundary'
 import BugReportModal from './components/BugReportModal'
 import './app.css'
@@ -28,7 +30,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'settings', label: 'Settings' },
 ]
 
-type AuthState = 'checking' | 'unauthenticated' | 'authenticated'
+type AuthState = 'checking' | 'unauthenticated' | 'authenticated' | 'guest'
 
 function useAuth() {
   const [authState, setAuthState] = useState<AuthState>('checking')
@@ -36,6 +38,8 @@ function useAuth() {
   const [level, setLevel] = useState<Privilege>('user')
 
   useEffect(() => {
+    // A guest session never has (or wants) a cookie — don't probe for one.
+    if (isGuestMode()) return
     fetch('/api/me', { credentials: 'include' })
       .then(async (res) => {
         if (res.ok) {
@@ -56,14 +60,27 @@ function useAuth() {
     setAuthState('authenticated')
   }
 
+  function onGuest() {
+    setGuestMode(true)
+    setUsername(GUEST_USERNAME)
+    setLevel('user')
+    setAuthState('guest')
+  }
+
   async function onLogout() {
-    await fetch('/api/logout', { method: 'POST', credentials: 'include' })
+    if (isGuestMode()) {
+      // Exiting guest mode unmounts the whole app tree, so the seeded demo
+      // state is dropped with it — there is nothing to clear.
+      setGuestMode(false)
+    } else {
+      await fetch('/api/logout', { method: 'POST', credentials: 'include' })
+    }
     setUsername(null)
     setLevel('user')
     setAuthState('unauthenticated')
   }
 
-  return { authState, username, level, onLogin, onLogout }
+  return { authState, username, level, onLogin, onGuest, onLogout }
 }
 
 function HeaderVersion() {
@@ -82,10 +99,11 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
   const [tab, setTab] = useState<Tab>('home')
   const [bugReportOpen, setBugReportOpen] = useState(false)
   const { einkMode, setEinkMode } = useEinkMode()
+  const guest = isGuestMode()
 
   return (
     <div className="app">
-      <TestModeBanner />
+      {guest ? <GuestBanner onExit={onLogout} /> : <TestModeBanner />}
       <header className="app-header">
         <div className="app-title-wrap">
           <span className="app-title">Let's Get Buff</span>
@@ -100,15 +118,18 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
         >
           {einkMode ? '● Colour' : '◐ E-ink'}
         </button>
-        <button
-          className="theme-toggle"
-          style={{ marginLeft: 8 }}
-          onClick={() => setBugReportOpen(true)}
-          title="Report a bug"
-          aria-label="Report a bug"
-        >
-          🐛
-        </button>
+        {/* Bug reports open a GitHub issue against the signed-in account — not for guests */}
+        {!guest && (
+          <button
+            className="theme-toggle"
+            style={{ marginLeft: 8 }}
+            onClick={() => setBugReportOpen(true)}
+            title="Report a bug"
+            aria-label="Report a bug"
+          >
+            🐛
+          </button>
+        )}
         <span className="header-user">{username}</span>
       </header>
       {bugReportOpen && (
@@ -153,7 +174,7 @@ export default function App() {
 }
 
 function AppRoutes() {
-  const { authState, username, level, onLogin, onLogout } = useAuth()
+  const { authState, username, level, onLogin, onGuest, onLogout } = useAuth()
 
   if (authState === 'checking') {
     return (
@@ -167,7 +188,7 @@ function AppRoutes() {
   }
 
   if (authState === 'unauthenticated') {
-    return <LoginView onLogin={onLogin} />
+    return <LoginView onLogin={onLogin} onGuest={onGuest} />
   }
 
   return (

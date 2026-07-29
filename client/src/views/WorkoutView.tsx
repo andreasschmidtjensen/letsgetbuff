@@ -17,6 +17,7 @@ import {
 } from '@dnd-kit/sortable'
 import { useStore } from '../store/store'
 import { useLiveOrder } from '../store/useLiveOrder'
+import { isGuestMode } from '../store/guest'
 import { preloadTimerSounds } from '../lib/sounds'
 import StartSessionModal from '../components/StartSessionModal'
 import { START_WARMUP_FLAG } from './StretchView'
@@ -45,6 +46,9 @@ const WORKOUT_OPTIONS: { value: GymWorkout; label: string }[] = [
 
 export default function WorkoutView({ username, level, onNavigate }: { username: string; level?: Privilege; onNavigate?: (tab: Tab) => void }) {
   const readOnly = level === 'viewer'
+  // Guests log freely (in memory) but have no account, so no server session,
+  // no partner and no live-order WebSocket.
+  const guest = isGuestMode()
   const { state, dispatch, syncStatus } = useStore()
   const todayStr = todayKey()
   const [dateStr, setDateStr] = useState(todayStr)
@@ -165,7 +169,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
   // (the server 403s POST /api/session), so they skip resolution entirely and just
   // observe the plan order read-only.
   useEffect(() => {
-    if (readOnly) {
+    if (readOnly || guest) {
       setSessionId(null); setSessionInfo(null); setShowStartModal(false)
       return
     }
@@ -194,7 +198,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
       .catch(() => { if (!cancelled) createSession('solo') })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateStr, workoutType, readOnly, resolveNonce])
+  }, [dateStr, workoutType, readOnly, guest, resolveNonce])
 
   const endCurrentSession = useCallback(async () => {
     if (sessionId == null) return
@@ -263,11 +267,13 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
   }
 
   const wsLabel =
+    guest                     ? { symbol: 'Guest — not saved', color: 'var(--text-muted)' } :
     wsStatus === 'open'       ? { symbol: 'Live', color: 'var(--green)' } :
     wsStatus === 'connecting' ? { symbol: 'Connecting...', color: 'var(--text-muted)' } :
     /* closed */                { symbol: 'Offline', color: 'var(--text-muted)' }
 
   const syncDot =
+    syncStatus === 'guest'   ? { color: 'var(--text-muted)', label: 'Not saved' } :
     syncStatus === 'synced'  ? { color: 'var(--green)',      label: 'Synced' } :
     syncStatus === 'syncing' ? { color: 'var(--text-muted)', label: 'Syncing...' } :
     syncStatus === 'offline' ? { color: 'var(--text-muted)', label: 'Offline' } :

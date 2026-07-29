@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../store/store'
+import { isGuestMode } from '../store/guest'
 import { useContainerWidth } from '../lib/useContainerWidth'
 import { WORKOUTS } from '@letsgetbuff/shared'
 import type { ExerciseDef, Session } from '@letsgetbuff/shared'
@@ -214,6 +215,7 @@ export default function HistoryView({ username }: { username: string }) {
   const [partnerSessions, setPartnerSessions] = useState<Record<string, Session>>({})
 
   useEffect(() => {
+    if (isGuestMode()) return   // no account → no partner history
     fetch('/api/partner-history', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then((data: { partnerUsername: string | null; sessions: Record<string, Session> } | null) => {

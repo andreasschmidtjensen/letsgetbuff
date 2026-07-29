@@ -46,6 +46,12 @@ only). One container serves the static client build + API + WS on **port 8585**.
   passwords; it issues its own HttpOnly, SameSite JWT cookie. Privilege levels live in
   `buff.db` (`user_privilege`), never in CWA. First-ever login bootstraps `admin`; every later
   new account starts at `none` (locked out) until an admin grants a level.
+- **Guest mode writes nothing.** "Continue as guest" on the login screen opens the whole app
+  on a seeded in-memory state (`client/src/store/guest.ts`). Every write path is shut off at
+  the choke point in `store/persistence.ts` — no `/api/state`, no localStorage, no proxy
+  queue — and account-bound UI (sessions/WS, partner history, backup/restore, AI proposals,
+  GitHub, bug report) is hidden. Only `GET /api/plan` is public (read-only, no user data);
+  any new guest-visible endpoint must stay read-only. Never add a guest write path.
 - **Bump `/api/health` `version` every phase** — it's how you confirm what's deployed.
 
 ## Data model (buff.db — separate from CWA's app.db)

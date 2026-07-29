@@ -3,6 +3,7 @@ import { SyncStatus } from '../../store/store'
 // Small sync badge shown at the top of Settings.
 export default function SyncBadge({ status, pending }: { status: SyncStatus; pending: number }) {
   const label =
+    status === 'guest'    ? '👤 Guest — not saved' :
     status === 'loading'  ? '⏳ Loading…' :
     status === 'syncing'  ? '⏳ Syncing…' :
     status === 'synced'   ? '✓ Synced'    :

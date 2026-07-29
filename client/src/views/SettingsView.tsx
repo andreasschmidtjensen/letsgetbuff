@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 import { useStore } from '../store/store'
+import { isGuestMode } from '../store/guest'
 import { exportData, validateImport, putServerState } from '../store/persistence'
 import { todayKey, SCHEMA_VERSION } from '@letsgetbuff/shared'
 import type { ExerciseDef, Privilege } from '@letsgetbuff/shared'
@@ -18,6 +19,9 @@ interface Props {
 }
 
 export default function SettingsView({ onLogout, level }: Props = {}) {
+  // Guests get the preference cards only: everything that reads or writes an
+  // account (backup/restore, AI proposals, GitHub, admin) is hidden.
+  const guest = isGuestMode()
   const { state, dispatch, syncStatus, pendingCount } = useStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -42,6 +46,7 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
   const [githubStatus, setGithubStatus] = useState<GithubStatus | null>(null)
 
   useEffect(() => {
+    if (guest) return   // these endpoints all require a session cookie
     fetch('/api/plan/proposals?status=pending', { credentials: 'include' })
       .then(r => r.json())
       .then((d: { proposals: Proposal[] }) => setProposals(d.proposals))
@@ -54,6 +59,7 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
       .then(r => r.ok ? r.json() : Promise.reject())
       .then((d: GithubStatus) => setGithubStatus(d))
       .catch(() => setGithubStatus({ configured: false, connected: false, githubLogin: null }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleApprove = async (id: number) => {
@@ -135,8 +141,8 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
         <SyncBadge status={syncStatus} pending={pendingCount} />
       </h2>
 
-      {/* Test mode (frontend-only sandbox) */}
-      <TestModeCard />
+      {/* Test mode (frontend-only sandbox) — guest mode already is one */}
+      {!guest && <TestModeCard />}
 
       {/* Start date */}
       <div className="card mb-12">
@@ -158,7 +164,7 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
       </div>
 
       {/* Export */}
-      <div className="card mb-12">
+      {!guest && <div className="card mb-12">
         <div className="card-title">Backup your data</div>
         <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
           Export current data as a JSON file (exports from server state via this session).
@@ -166,10 +172,10 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
         <button className="btn btn-secondary" onClick={() => exportData(state)}>
           Export data
         </button>
-      </div>
+      </div>}
 
       {/* Import */}
-      <div className="card mb-12">
+      {!guest && <div className="card mb-12">
         <div className="card-title">Restore from backup</div>
         <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
           Import a previously exported JSON file. Older backup versions are migrated automatically.
@@ -195,7 +201,7 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
         {imported && (
           <p style={{ color: 'var(--green)', fontSize: 13, marginTop: 8 }}>Data imported and synced to server.</p>
         )}
-      </div>
+      </div>}
 
       {/* Rest timer */}
       <RestTimerCard />
@@ -203,8 +209,8 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
       {/* Timer sound */}
       <TimerSoundCard />
 
-      {/* Phase 8: Exercise discovery */}
-      <div className="card mb-12">
+      {/* Phase 8: Exercise discovery — changes the shared plan, so not for guests */}
+      {!guest && <div className="card mb-12">
         <div className="card-title">🤖 Add an exercise with Claude</div>
         <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
           Describe what you need and Claude will propose a schema-valid exercise following the
@@ -214,7 +220,7 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
           onProposed={p => setProposals(prev => [p, ...prev])}
           aiConfigured={aiConfigured}
         />
-      </div>
+      </div>}
 
       {/* Pending proposals */}
       {proposals.length > 0 && (
@@ -242,7 +248,7 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
       )}
 
       {/* GitHub account for bug reporting (the report form is the 🐛 header popup) */}
-      <GithubConnectCard status={githubStatus} onChange={setGithubStatus} />
+      {!guest && <GithubConnectCard status={githubStatus} onChange={setGithubStatus} />}
 
       {/* Admin: API key + GitHub client ID + user access (only rendered for admins) */}
       {level === 'admin' && <ApiKeyCard />}
@@ -259,22 +265,26 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
         <div className="card-title">About</div>
         <div className="muted" style={{ fontSize: 13 }}>
           Schema version: {SCHEMA_VERSION}<br />
-          Data stored on your self-hosted server. Local cache kept in browser for offline use.
+          {guest
+            ? 'Guest session — everything you log stays in this tab and is discarded on reload.'
+            : 'Data stored on your self-hosted server. Local cache kept in browser for offline use.'}
         </div>
       </div>
 
-      {/* Logout */}
+      {/* Logout / leave guest mode */}
       {onLogout && (
         <div className="card">
           <div className="card-title">Account</div>
           <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
-            Manage your account in Calibre-Web Automated.
+            {guest
+              ? 'You are browsing as a guest. Sign in to save your training.'
+              : 'Manage your account in Calibre-Web Automated.'}
           </p>
           <button
             className="btn btn-secondary"
             onClick={() => setConfirmLogout(true)}
           >
-            Sign out
+            {guest ? 'Sign in' : 'Sign out'}
           </button>
         </div>
       )}
@@ -302,8 +312,8 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
       )}
       {confirmLogout && (
         <ConfirmDialog
-          message="Sign out?"
-          confirmLabel="Sign out"
+          message={guest ? 'Leave guest mode? Anything you logged is discarded.' : 'Sign out?'}
+          confirmLabel={guest ? 'Leave' : 'Sign out'}
           onConfirm={() => { setConfirmLogout(false); onLogout?.() }}
           onCancel={() => setConfirmLogout(false)}
         />

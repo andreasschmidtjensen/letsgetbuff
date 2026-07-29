@@ -701,6 +701,11 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 }
 .test-mode-banner-exit:hover { background: rgba(0, 0, 0, 0.4); }
 
+/* Guest mode reuses the banner layout with its own colour */
+.guest-banner { background: var(--blue); color: #fff; }
+.guest-banner .test-mode-banner-exit { background: rgba(255, 255, 255, 0.25); color: #fff; }
+.guest-banner .test-mode-banner-exit:hover { background: rgba(255, 255, 255, 0.4); }
+
 /* ── General a11y improvements ──────────────────────────────────────────────── */
 .btn:focus-visible,
 .nav-btn:focus-visible,
@@ -768,6 +773,8 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 [data-theme="eink"] .rest-timer-overlay { background: rgba(255, 255, 255, 0.92); }
 [data-theme="eink"] .test-mode-banner { background: #000; color: #fff; }
 [data-theme="eink"] .test-mode-banner-exit { background: #fff; color: #000; }
+[data-theme="eink"] .guest-banner { background: #000; color: #fff; }
+[data-theme="eink"] .guest-banner .test-mode-banner-exit { background: #fff; color: #000; }
 
 /* "Next exercise" ready: a strong static outline instead of a pulse */
 [data-theme="eink"] .focus-next-ready { outline: 3px solid #000; outline-offset: -3px; }
