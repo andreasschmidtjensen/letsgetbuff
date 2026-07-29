@@ -198,7 +198,7 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
       window.removeEventListener('online', retry)
       clearInterval(interval)
     }
-  }, [pendingCount])
+  }, [pendingCount, guest])
 
   // ── 4. Flush on tab close ─────────────────────────────────────────────────
   useEffect(() => {
@@ -208,7 +208,7 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
       window.removeEventListener('beforeunload', flush)
       flush()
     }
-  }, [])
+  }, [guest])
 
   // ── 5. Leaving test mode → discard sandbox edits, restore real data ───────
   const prevTestMode = useRef(testMode)
@@ -226,7 +226,7 @@ export function StoreProvider({ children, username }: StoreProviderProps) {
       }
     }
     prevTestMode.current = testMode
-  }, [testMode])
+  }, [testMode, guest])
 
   const stableDispatch = useCallback(dispatch, [dispatch])
 
