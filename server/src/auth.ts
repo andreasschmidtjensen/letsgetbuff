@@ -275,7 +275,9 @@ export function requirePrivilege(min: Privilege) {
 // access to the trainings) needs it to show the real shared plan rather than the
 // bundled seed. Every other plan route (proposals, propose, approve, reject)
 // stays behind the guard.
-const PUBLIC_ROUTES = new Set(['/api/login', '/api/health', '/api/plan'])
+// `/api/commits` is public for the same reason: it mirrors commits from a
+// public repo, holds no user data, and the header badge renders in guest mode.
+const PUBLIC_ROUTES = new Set(['/api/login', '/api/health', '/api/plan', '/api/commits'])
 
 /**
  * Current privilege straight from buff.db — the authoritative source. The JWT

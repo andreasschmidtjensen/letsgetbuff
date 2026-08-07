@@ -69,8 +69,12 @@ offline cache + outbound mutation queue, not the system of record.
   alongside Calibre-Web Automated. The `.env` (SESSION_SECRET, ANTHROPIC_API_KEY) lives **only**
   on the server — never commit it (`.gitignore` enforces this).
 - **Rollback:** `git revert <bad-commit> && git push` redeploys the previous version.
-- **Verify a deploy:** on the server, `curl http://127.0.0.1:8585/api/health` — `version` should
-  match the phase you just shipped.
+- **Verify a deploy:** `curl https://letsgetbuff.dk/api/health` — `version` should match the phase
+  you just shipped and `sha` the commit. (Port 8585 is firewalled, so the raw IP won't answer.)
+- **Verify what a *browser* is running:** the header badge next to 🐛 shows `v<version> · <sha>`,
+  where the sha is baked into the bundle at build time (Docker build-arg ← `${{ github.sha }}`).
+  If it disagrees with the server's sha the badge turns amber with ⚠ and offers a reload that
+  unregisters the service worker — the PWA caches aggressively, so "deployed" ≠ "loaded".
 
 ## Build plan & working style
 Phased rebuild. **Per-session protocol: read `build-plan/00-MASTER-BRIEF.md` + the one relevant

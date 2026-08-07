@@ -23,6 +23,13 @@ COPY shared/ ./shared/
 COPY client/ ./client/
 COPY server/ ./server/
 
+# The commit this image is built from. There is no .git in the build context,
+# so CI passes it in (deploy.yml: build-args GIT_SHA=${{ github.sha }}). The
+# client bakes it into the bundle; the runner stage re-declares it for the
+# server, so /api/health can report it and a stale client is detectable.
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
+
 # Build: shared first (server imports it at runtime), then client and server
 RUN npm run build -w shared
 RUN npm run build -w client
@@ -55,6 +62,10 @@ COPY --from=builder /app/client/dist ./client/dist
 
 # Data dir for buff.db (should be a named volume in production)
 RUN mkdir -p /data
+
+# ARG does not cross stages — re-declare so the running server sees it too.
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
 
 ENV NODE_ENV=production
 ENV PORT=8585

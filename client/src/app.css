@@ -81,6 +81,8 @@ body {
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
+  /* Positioning context for .version-popover */
+  position: relative;
 }
 
 .app-title-wrap {
@@ -97,9 +99,105 @@ body {
   letter-spacing: -0.3px;
 }
 
-.app-version {
+/* Build badge + hover notes, sitting next to the bug button in the header */
+/* Deliberately NOT the positioning context: the popover is wider than the badge
+   and would overflow the left edge of a phone viewport if anchored to it, so it
+   anchors to .app-header instead (see .version-popover). */
+.version-badge-wrap {
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.version-badge {
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  font-family: inherit;
   font-size: 10px;
   color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.version-badge-stale {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Anchored to the header's right edge, not the badge's, so it stays on screen
+   at any width. .app-header carries the position: relative for this. */
+.version-popover {
+  position: absolute;
+  top: calc(100% - 4px);
+  right: 12px;
+  z-index: 60;
+  width: min(19rem, calc(100vw - 24px));
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  text-align: left;
+  white-space: normal;
+}
+
+.version-popover-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.version-popover code {
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.version-stale-note {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.45;
+}
+
+.version-notes {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.version-notes li {
+  padding: 3px 0;
+  line-height: 1.35;
+}
+
+.version-notes a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.version-notes a:hover {
+  text-decoration: underline;
+}
+
+/* The commit this bundle was actually built from */
+.version-note-current a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.version-note {
+  padding: 3px 0 8px;
+}
+
+.version-repo-link {
+  display: inline-block;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 11px;
+}
+
+.version-repo-link:hover {
+  text-decoration: underline;
 }
 
 /* Username, right side of the header */

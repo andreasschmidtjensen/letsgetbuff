@@ -8,7 +8,7 @@ import { config } from './config.js'
 import { openDb } from './db.js'
 import { loginHandler, logoutHandler, meHandler, authGuard, liveLevel, closeCwaDb } from './auth.js'
 import { registerApiRoutes } from './api.js'
-import { APP_VERSION } from './version.js'
+import { APP_VERSION, GIT_SHA, SHORT_SHA } from './version.js'
 import { createWsServer, authenticateUpgrade, AuthedClient } from './ws.js'
 import { startBackupScheduler } from './backup.js'
 
@@ -48,7 +48,11 @@ async function start() {
 
   // Live order is now session-scoped — see GET /api/session/:id/live-order (api.ts).
 
-  app.get('/api/health', async () => ({ ok: true, version: APP_VERSION }))
+  // `sha` is what the client compares against its own baked-in build sha to
+  // detect a stale service-worker cache; `version` stays for the deploy check.
+  app.get('/api/health', async () => ({
+    ok: true, version: APP_VERSION, sha: GIT_SHA, shortSha: SHORT_SHA,
+  }))
 
   if (!config.isDev) {
     const staticDir = path.isAbsolute(config.staticDir)

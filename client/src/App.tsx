@@ -17,6 +17,7 @@ import GuestBanner from './components/GuestBanner'
 import { isGuestMode, setGuestMode, GUEST_USERNAME } from './store/guest'
 import ErrorBoundary from './components/ErrorBoundary'
 import BugReportModal from './components/BugReportModal'
+import VersionBadge from './components/VersionBadge'
 import './app.css'
 
 const TABS: { id: Tab; label: string }[] = [
@@ -83,18 +84,6 @@ function useAuth() {
   return { authState, username, level, onLogin, onGuest, onLogout }
 }
 
-function HeaderVersion() {
-  const [version, setVersion] = useState<number | null>(null)
-  useEffect(() => {
-    fetch('/api/health')
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (d?.version != null) setVersion(d.version) })
-      .catch(() => { /* offline — leave blank */ })
-  }, [])
-  if (version == null) return null
-  return <span className="app-version">v{version}</span>
-}
-
 function AppInner({ username, level, onLogout }: { username: string; level: Privilege; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('home')
   const [bugReportOpen, setBugReportOpen] = useState(false)
@@ -107,7 +96,6 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
       <header className="app-header">
         <div className="app-title-wrap">
           <span className="app-title">Let's Get Buff</span>
-          <HeaderVersion />
         </div>
         <button
           className="theme-toggle"
@@ -118,6 +106,9 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
         >
           {einkMode ? '● Colour' : '◐ E-ink'}
         </button>
+        {/* Build identity sits next to the bug button: a report is only useful
+            with the exact build it came from. */}
+        <VersionBadge />
         {/* Bug reports open a GitHub issue against the signed-in account — not for guests */}
         {!guest && (
           <button
