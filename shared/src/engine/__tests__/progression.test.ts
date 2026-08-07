@@ -119,7 +119,10 @@ describe('repTargetFor', () => {
     expect(repTargetFor(plank, 17)).toEqual({ sets: 3, seconds: 60 })
   })
 
-  it('Face Pull: 3x15 in band 2, 3x12 in band 3', () => {
+  it('Face Pull: 3x15 in bands 1 and 2, 3x12 in band 3', () => {
+    // Band 1 is reachable now that a logged Face Pull survives a week drop:
+    // same load, 15 reps instead of 12 — a volume increase, which is fine.
+    expect(repTargetFor(facePull, 1)).toEqual({ sets: 3, reps: 15 })
     expect(repTargetFor(facePull, 9)).toEqual({ sets: 3, reps: 15 })
     expect(repTargetFor(facePull, 17)).toEqual({ sets: 3, reps: 12 })
   })

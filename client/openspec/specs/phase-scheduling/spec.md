@@ -4,23 +4,35 @@
 TBD - created by archiving change fitness-progress-tracker. Update Purpose after archive.
 ## Requirements
 ### Requirement: Program week from completed training weeks
-The system SHALL track a program week number that advances based on weeks the user actually trained, not the calendar. Each calendar week counts toward the program week only if it was not marked skipped.
+The system SHALL track a program week number that advances based on weeks the user actually trained, not the calendar. An elapsed calendar week counts toward the program week only if it contains at least one gym session (Workout A or B) and was not marked skipped. The calendar week the user is currently in always counts, unless marked skipped, so the counter never moves backwards.
 
 #### Scenario: Trained week advances
-- **WHEN** a calendar week contains at least one completed activity and is not marked skipped
+- **WHEN** an elapsed calendar week contains at least one gym session and is not marked skipped
 - **THEN** that week counts toward the program week number
+
+#### Scenario: Untrained week does not advance
+- **WHEN** an elapsed calendar week contains no gym session
+- **THEN** that week does not count toward the program week, and the following week resumes at the same program week number
+
+#### Scenario: Only non-gym training does not advance
+- **WHEN** a calendar week contains only home workouts, stretch sessions, runs or rides and no Workout A or B
+- **THEN** that week does not count toward the program week, and those activities are still recorded and shown in history
+
+#### Scenario: Session counted before it is marked done
+- **WHEN** a Workout A or B session for a day has at least one set logged with reps or seconds but has not been marked done
+- **THEN** that week counts as trained
 
 #### Scenario: Skipped week does not advance
 - **WHEN** the user marks a calendar week "I didn't train this week"
-- **THEN** that week does not count toward the program week and the phase schedule stays aligned with prior training
+- **THEN** that week does not count toward the program week even if a gym session was logged in it, and the phase schedule stays aligned with prior training
 
 #### Scenario: Set start date
 - **WHEN** the user sets or changes the plan start date
-- **THEN** the system recomputes the program week from the start date forward, excluding skipped weeks
+- **THEN** the system recomputes the program week from the start date forward, counting only trained, non-skipped weeks
 
 #### Scenario: Backdated start date
 - **WHEN** the user sets a start date earlier than today (e.g. this past Tuesday)
-- **THEN** the system computes the program week as the count of elapsed non-skipped ISO weeks since that date, so a start in the current week yields program week 1 and the current week's schedule
+- **THEN** the system computes the program week as the count of elapsed trained, non-skipped ISO weeks since that date plus the current week, so a start in the current week yields program week 1 and the current week's schedule
 
 ### Requirement: Phase derivation
 The system SHALL derive the current phase from the program week: Phase 1 Foundation (weeks 1-4), Phase 2 Build (weeks 5-16), Phase 3 Consolidate (weeks 17-26).

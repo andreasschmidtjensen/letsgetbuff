@@ -1,4 +1,6 @@
+import type { Session } from '../types.js'
 import { keyToDate, addDays } from '../lib/date.js'
+import { hasRealSet } from './history.js'
 
 // ISO week key: "2026-W23"
 export function isoWeekKey(date: Date): string {
@@ -20,21 +22,55 @@ export function weekKeyToMonday(key: string): Date {
   return new Date(weekStart.getUTCFullYear(), weekStart.getUTCMonth(), weekStart.getUTCDate(), 12)
 }
 
-// Compute program week: count of elapsed ISO weeks from startDate not in skippedWeeks, capped at 26
-export function computeProgramWeek(startDate: string, skippedWeeks: string[], today: Date): number {
+// Only a real gym session — Workout A or B — advances the program week. Home
+// workouts, stretches, runs and rides are still tracked (AppState.activities /
+// stretchSessions) but are deliberately not training weeks for the plan: the
+// phase schedule is built around the two barbell/dumbbell days.
+// A session counts once it is marked done, or as soon as any set carries a real
+// rep/second value (`hasRealSet`), so a session left unmarked at the end of a
+// workout still counts.
+export function isGymTraining(session: Session): boolean {
+  if (session.workout !== 'A' && session.workout !== 'B') return false
+  if (session.done) return true
+  return Object.values(session.entries).some(hasRealSet)
+}
+
+// ISO week keys in which at least one gym session was trained.
+export function trainedWeekKeys(sessions: Record<string, Session>): Set<string> {
+  const keys = new Set<string>()
+  for (const [date, session] of Object.entries(sessions)) {
+    if (isGymTraining(session)) keys.add(isoWeekKey(keyToDate(date)))
+  }
+  return keys
+}
+
+// Compute program week, capped at 26. Elapsed weeks before the current one count
+// only if they contain a gym session and are not in skippedWeeks; the week you
+// are currently in always counts (it is the week you are training in now) unless
+// explicitly marked skipped. The counter therefore never runs ahead of actual
+// training, and never moves backwards.
+export function computeProgramWeek(
+  startDate: string,
+  skippedWeeks: string[],
+  sessions: Record<string, Session>,
+  today: Date,
+): number {
   const startKey = isoWeekKey(keyToDate(startDate))
   const todayWeekKey = isoWeekKey(today)
 
   let current = weekKeyToMonday(startKey)
   const skippedSet = new Set(skippedWeeks)
+  const trained = trainedWeekKeys(sessions)
   let count = 0
 
   let key = isoWeekKey(current)
-  while (key <= todayWeekKey && count < 26) {
-    if (!skippedSet.has(key)) count++
+  while (key < todayWeekKey && count < 26) {
+    if (!skippedSet.has(key) && trained.has(key)) count++
     current = addDays(current, 7)
     key = isoWeekKey(current)
   }
+
+  if (key === todayWeekKey && !skippedSet.has(todayWeekKey)) count++
 
   return Math.max(1, Math.min(26, count))
 }

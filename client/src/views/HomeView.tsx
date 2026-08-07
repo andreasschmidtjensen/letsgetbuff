@@ -44,7 +44,7 @@ function nextGymSession(
     const d = new Date(from)
     d.setDate(d.getDate() + i)
     const key = dateKey(d)
-    const pw = computeProgramWeek(startDate, skippedWeeks, d)
+    const pw = computeProgramWeek(startDate, skippedWeeks, sessions, d)
     const activity = scheduleFor(pw)[todayDayName(d)]
     if ((activity === 'gym-a' || activity === 'gym-b') && !sessions[key]?.done) {
       return { dateKey: key, date: d, workout: activity === 'gym-a' ? 'A' : 'B', programWeek: pw }
@@ -189,7 +189,7 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
     )
   }
 
-  const programWeek = computeProgramWeek(state.startDate, state.skippedWeeks, today)
+  const programWeek = computeProgramWeek(state.startDate, state.skippedWeeks, state.sessions, today)
   const { label: phaseLabel } = phaseFor(programWeek)
   const schedule = scheduleFor(programWeek)
   const todayDay = todayDayName(today)
@@ -206,7 +206,7 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
   // Viewed week for the schedule grid (0 = current, negative = past)
   const viewMonday = addDays(weekKeyToMonday(currentWeekKey), weekOffset * 7)
   const viewWeekKey = isoWeekKey(viewMonday)
-  const viewProgramWeek = computeProgramWeek(state.startDate, state.skippedWeeks, viewMonday)
+  const viewProgramWeek = computeProgramWeek(state.startDate, state.skippedWeeks, state.sessions, viewMonday)
   const viewSchedule = scheduleFor(viewProgramWeek)
   const startWeekKey = isoWeekKey(keyToDate(state.startDate))
   const canGoBack = viewWeekKey > startWeekKey

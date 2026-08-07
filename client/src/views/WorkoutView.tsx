@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -25,7 +25,7 @@ import { parseWarmup } from '../components/workout/helpers'
 import { SessionTimer, WarmupChecklist } from '../components/workout/timers'
 import { SortableExerciseLogger } from '../components/workout/ExerciseLogger'
 import FocusMode from '../components/workout/FocusMode'
-import { computeProgramWeek, scheduleFor, todayDayName } from '@letsgetbuff/shared'
+import { computeProgramWeek, scheduleFor, todayDayName, loggedExerciseIds } from '@letsgetbuff/shared'
 import { todayKey, keyToDate } from '@letsgetbuff/shared'
 import { getWorkoutExercises, getWorkout, ExerciseDef, repBandFor } from '@letsgetbuff/shared'
 import { Session } from '@letsgetbuff/shared'
@@ -102,7 +102,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
     for (let i = 0; i <= 14; i++) {
       const d = keyToDate(date)
       d.setDate(d.getDate() + i)
-      const week = computeProgramWeek(state.startDate, state.skippedWeeks, d)
+      const week = computeProgramWeek(state.startDate, state.skippedWeeks, state.sessions, d)
       const act = scheduleFor(week)[todayDayName(d)]
       if (act === 'gym-a') return 'A'
       if (act === 'gym-b') return 'B'
@@ -128,11 +128,15 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
   }
   const session = state.sessions[dateStr]
   const programWeek = state.startDate
-    ? computeProgramWeek(state.startDate, state.skippedWeeks, keyToDate(dateStr))
+    ? computeProgramWeek(state.startDate, state.skippedWeeks, state.sessions, keyToDate(dateStr))
     : 1
   const restDefaultSecs = restPrefSecs ?? (repBandFor(programWeek) === 3 ? 150 : REST_SECS_DEFAULT)
 
-  const planExercises = getWorkoutExercises(workoutType, programWeek)
+  // "Once trained, always yours": an exercise already logged stays in the plan
+  // even if the program week later drops below its minWeek.
+  const loggedIds = useMemo(() => loggedExerciseIds(state.sessions), [state.sessions])
+
+  const planExercises = getWorkoutExercises(workoutType, programWeek, loggedIds)
   const planOrder = planExercises.map(e => e.id)
 
   // ── Phase 13: session resolution (alone / with-partner / resume) ──────────

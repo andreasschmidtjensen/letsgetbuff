@@ -25,7 +25,10 @@ export interface ExerciseDef {
   alternatives: string[]
   notes: string
   safetyCues: SafetyCue[]
-  minWeek?: number // Face Pull: only from week 9
+  // Onboarding ramp: hidden until this program week. Face Pull (9) is the only
+  // one in the seeded catalog, but AI-discovered exercises can carry it too.
+  // `getWorkoutExercises` overrides it for exercises the user has already logged.
+  minWeek?: number
   repProgression?: {
     band1: RepTarget
     band2: RepTarget
@@ -290,7 +293,10 @@ export const WORKOUTS: WorkoutDef[] = [
         safetyCues: [],
         minWeek: 9,
         repProgression: {
-          band1: { sets: 3, reps: 15 }, // minWeek:9 means this won't be shown in band1
+          // Band 1 is reachable: once trained, Face Pull stays in the plan even
+          // if the program week falls back below 9 (missed weeks, or the start
+          // date moved forward), and the rep band follows the lower week.
+          band1: { sets: 3, reps: 15 },
           band2: { sets: 3, reps: 15 },
           band3: { sets: 3, reps: 12 },
         },
@@ -340,6 +346,10 @@ export const DEFAULT_PLAN: Plan = {
 // any client can override it); only the browser client ever calls setLivePlan().
 let _livePlan: Plan | null = null
 
+// Shared empty default for getWorkoutExercises — avoids allocating a Set on
+// every render for callers that have no logged history to pass.
+const NO_LOGGED_IDS: ReadonlySet<string> = new Set()
+
 /**
  * Override the active plan with the server-fetched version.
  * Call once at app startup after /api/plan resolves.
@@ -360,10 +370,29 @@ export function getWorkout(id: 'A' | 'B'): WorkoutDef | undefined {
   return getPlan().workouts.find(w => w.id === id)
 }
 
-export function getWorkoutExercises(workout: 'A' | 'B', programWeek: number): ExerciseDef[] {
+/**
+ * The exercises to show for a workout at a given program week.
+ *
+ * `minWeek` is an onboarding ramp: an exercise stays out of the plan until the
+ * lifter has some weeks behind them. But the program week can move DOWN —
+ * `computeProgramWeek` counts only weeks containing a real gym session, and
+ * Settings lets the start date move forward — so a pure week test would delete
+ * an exercise the user has already been training. Anything in `loggedIds` is
+ * therefore kept regardless of week: once trained, always yours. The rep band
+ * still follows the (lower) week, so the exercise comes back with its band-1
+ * target rather than disappearing.
+ *
+ * `loggedIds` (build it with `loggedExerciseIds(state.sessions)`) is optional
+ * and defaults to empty, so pure-catalog callers get the plain week-based ramp.
+ */
+export function getWorkoutExercises(
+  workout: 'A' | 'B',
+  programWeek: number,
+  loggedIds: ReadonlySet<string> = NO_LOGGED_IDS,
+): ExerciseDef[] {
   const w = getWorkout(workout)
   if (!w) return []
-  return w.exercises.filter(e => !e.minWeek || programWeek >= e.minWeek)
+  return w.exercises.filter(e => !e.minWeek || programWeek >= e.minWeek || loggedIds.has(e.id))
 }
 
 export function getExercise(id: string): ExerciseDef | undefined {
