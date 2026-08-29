@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { StoreProvider } from './store/store'
 import { TestModeProvider } from './store/testMode'
 import { EinkModeProvider, useEinkMode } from './store/einkMode'
+import { UiVersionProvider } from './store/uiVersion'
 import { Tab, Privilege } from '@letsgetbuff/shared'
 import HomeView from './views/HomeView'
 import WorkoutView from './views/WorkoutView'
@@ -184,11 +185,13 @@ function AppRoutes() {
 
   return (
     <EinkModeProvider>
-      <TestModeProvider>
-        <StoreProvider username={username!}>
-          <AppInner username={username!} level={level} onLogout={onLogout} />
-        </StoreProvider>
-      </TestModeProvider>
+      <UiVersionProvider>
+        <TestModeProvider>
+          <StoreProvider username={username!}>
+            <AppInner username={username!} level={level} onLogout={onLogout} />
+          </StoreProvider>
+        </TestModeProvider>
+      </UiVersionProvider>
     </EinkModeProvider>
   )
 }

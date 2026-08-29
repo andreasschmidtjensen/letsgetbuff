@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#0a0a0b; color:#ecedee; font-family:'Sora',system-ui,sans-serif; }
+  a { color:#e8a020; text-decoration:none; }
+  a:hover { color:#f5bb52; text-decoration:underline; }
+</style>
+</helmet>
+
+<section style="display:flex;flex-direction:column;gap:56px;padding:48px 48px 96px;background:#0a0a0b">
+
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:900px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;color:#e8a020">TURN 1 · LET'S GET BUFF</div>
+    <h1 style="margin:0;font-size:40px;font-weight:800;letter-spacing:-1px;line-height:1.05">Training together on one phone</h1>
+    <p style="margin:0;font-size:15px;line-height:1.6;color:#9aa0a6;text-wrap:pretty">Three takes on the focus screen — <a href="#1a">1a</a>, <a href="#1b">1b</a>, <a href="#1c">1c</a> — each with a different answer to the two-person rest problem. Below them: the Side Plank / per-side fix (<a href="#1d">1d</a>), overview and today (<a href="#1e">1e</a>), and the e-ink check (<a href="#1f">1f</a>). New type: Sora for UI, JetBrains Mono for every number. Amber stays you, lime is your partner, and "done" is a plain tick so colour never carries two meanings.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+
+    <!-- ══════════ 1a ══════════ -->
+    <div id="1a" style="display:flex;flex-direction:column;gap:14px;width:390px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#0a0a0b;background:#e8a020;border-radius:6px;padding:3px 8px">1a</span>
+        <span style="font-size:17px;font-weight:700">Rest dock</span>
+      </div>
+      <p style="margin:0;font-size:13px;line-height:1.6;color:#9aa0a6;text-wrap:pretty">Rest never covers the screen. Two lanes live in a dock above the nav — one per person, each with its own countdown. In <em>rest together</em> the lanes merge into one wide lane. Confirming a set starts only your lane; the partner's lane keeps running so you can always see who is up next. You can log, fix a number or watch the video while resting.</p>
+
+      <div style="width:390px;height:844px;background:#0d0d0e;border:1px solid #2c2f34;border-radius:28px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;padding:14px 14px 12px;background:#131416;border-bottom:1px solid #2c2f34">
+          <button style="background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:9px;padding:8px 12px;font-family:'Sora',sans-serif;font-size:13px;font-weight:600">Overview</button>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9aa0a6">3/9</span>
+          <div style="flex:1;height:4px;background:#202226;border-radius:2px;overflow:hidden">
+            <div style="width:33%;height:100%;background:#e8a020"></div>
+          </div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9aa0a6">18:04</span>
+        </div>
+
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:14px;padding:16px 14px">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <div style="font-size:26px;font-weight:700;letter-spacing:-0.6px">Leg Press</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9aa0a6">3×10</div>
+            <button style="margin-left:auto;background:none;border:1px solid #2c2f34;color:#9aa0a6;border-radius:8px;padding:6px 10px;font-family:'Sora',sans-serif;font-size:12px;font-weight:600">▶ Form</button>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px;background:#131416;border:1px solid #2c2f34;border-radius:12px;padding:6px">
+            <div style="display:flex;background:#0d0d0e;border-radius:9px;padding:3px;gap:3px;flex:1">
+              <div style="flex:1;text-align:center;padding:9px 0;border-radius:7px;font-size:13px;font-weight:600;color:#9aa0a6">Together</div>
+              <div style="flex:1;text-align:center;padding:9px 0;border-radius:7px;background:#e8a020;color:#0a0a0b;font-size:13px;font-weight:700">Take turns</div>
+            </div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196;padding-right:6px;line-height:1.3">saved for<br>leg press</span>
+          </div>
+
+          <div style="display:flex;gap:8px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#8b9196">
+            <span style="background:#17181a;border:1px solid #24262a;border-radius:7px;padding:6px 9px">1 ✓ 60kg ×10</span>
+            <span style="background:#17181a;border:1px solid #24262a;border-radius:7px;padding:6px 9px">2 ✓ 60kg ×10</span>
+          </div>
+
+          <div style="background:#17181a;border:1px solid #33363c;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#e8a020;background:#3a2a06;border-radius:6px;padding:4px 8px">YOU · SET 3 OF 3</span>
+              <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">last 60kg ×10</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196;letter-spacing:0.08em">KG</span>
+                <div style="background:#0d0d0e;border:1px solid #33363c;border-radius:10px;padding:14px 0;text-align:center;font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700">62.5</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196;letter-spacing:0.08em">REPS</span>
+                <div style="background:#0d0d0e;border:1px solid #33363c;border-radius:10px;padding:14px 0;text-align:center;font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700">10</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196;letter-spacing:0.08em">RIR</span>
+                <div style="background:#0d0d0e;border:1px solid #2c2f34;border-radius:10px;padding:14px 0;text-align:center;font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:500;color:#8b9196">2</div>
+              </div>
+            </div>
+            <button style="width:100%;min-height:60px;background:#e8a020;color:#0a0a0b;border:none;border-radius:12px;font-family:'Sora',sans-serif;font-size:17px;font-weight:700">✓ Log set 3 · start my rest</button>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;background:#131416;border:1px solid #2c2f34;border-left:3px solid #7fd14b;border-radius:12px;padding:12px 14px">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="font-size:14px;font-weight:600;color:#7fd14b">Mette</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9aa0a6">set 2 of 3 · 55kg ×10</span>
+            </div>
+            <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#9aa0a6">tap to log for her</span>
+          </div>
+        </div>
+
+        <div style="background:#131416;border-top:1px solid #2c2f34;padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="width:52px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#e8a020;letter-spacing:0.06em">YOU</span>
+            <div style="flex:1;height:10px;background:#202226;border-radius:5px;overflow:hidden">
+              <div style="width:62%;height:100%;background:#e8a020;border-radius:5px"></div>
+            </div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;width:58px;text-align:right">0:56</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="width:52px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#7fd14b;letter-spacing:0.06em">METTE</span>
+            <div style="flex:1;height:10px;background:#202226;border-radius:5px;overflow:hidden">
+              <div style="width:100%;height:100%;background:#7fd14b;border-radius:5px"></div>
+            </div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;width:58px;text-align:right;color:#7fd14b">HER GO</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button style="flex:1;background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:9px;padding:10px 0;font-family:'JetBrains Mono',monospace;font-size:13px">−15s</button>
+            <button style="flex:1;background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:9px;padding:10px 0;font-family:'Sora',sans-serif;font-size:13px;font-weight:600">Pause</button>
+            <button style="flex:1;background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:9px;padding:10px 0;font-family:'JetBrains Mono',monospace;font-size:13px">+15s</button>
+            <button style="flex:1;background:#202226;border:1px solid #2c2f34;color:#9aa0a6;border-radius:9px;padding:10px 0;font-family:'Sora',sans-serif;font-size:13px;font-weight:600">Skip</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;padding:12px 14px 16px;background:#131416;border-top:1px solid #2c2f34">
+          <button style="flex:1;background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:11px;min-height:52px;font-family:'Sora',sans-serif;font-size:15px;font-weight:600">Prev</button>
+          <button style="flex:2;background:#202226;border:1px solid #2c2f34;color:#9aa0a6;border-radius:11px;min-height:52px;font-family:'Sora',sans-serif;font-size:15px;font-weight:600">Next exercise →</button>
+        </div>
+      </div>
+
+      <div style="background:#131416;border:1px solid #2c2f34;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#e8a020">TOGETHER MODE</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="flex:1;height:12px;background:#202226;border-radius:6px;overflow:hidden">
+            <div style="width:48%;height:100%;background:linear-gradient(90deg,#e8a020,#7fd14b);border-radius:6px"></div>
+          </div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700">1:29</span>
+        </div>
+        <p style="margin:0;font-size:12px;line-height:1.6;color:#9aa0a6">One lane, both names on it. Either person's confirm starts it; the second confirm inside the window joins it instead of restarting.</p>
+      </div>
+    </div>
+
+    <!-- ══════════ 1b ══════════ -->
+    <div id="1b" style="display:flex;flex-direction:column;gap:14px;width:390px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#0a0a0b;background:#e8a020;border-radius:6px;padding:3px 8px">1b</span>
+        <span style="font-size:17px;font-weight:700">Split ring</span>
+      </div>
+      <p style="margin:0;font-size:13px;line-height:1.6;color:#9aa0a6;text-wrap:pretty">Rest keeps the full-screen ring you have today, but the ring is split in two arcs — amber outside for you, lime inside for her. Whoever hits zero first gets the whole screen: a big "GO" and the name. Readable from a metre away with the phone on the floor. In together mode the two arcs fuse into one thick ring.</p>
+
+      <div style="width:390px;height:844px;background:#0d0d0e;border:1px solid #2c2f34;border-radius:28px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;padding:14px 14px 12px;background:#131416;border-bottom:1px solid #2c2f34">
+          <button style="background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:9px;padding:8px 12px;font-family:'Sora',sans-serif;font-size:13px;font-weight:600">Overview</button>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9aa0a6">3/9</span>
+          <div style="flex:1;height:4px;background:#202226;border-radius:2px;overflow:hidden">
+            <div style="width:33%;height:100%;background:#e8a020"></div>
+          </div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9aa0a6">18:04</span>
+        </div>
+
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 18px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.14em;color:#9aa0a6">REST · TAKING TURNS</div>
+          <div style="font-size:20px;font-weight:700;margin-bottom:4px">Leg Press</div>
+
+          <div style="position:relative;width:280px;height:280px;display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 200 200" style="position:absolute;inset:0;width:280px;height:280px" aria-hidden="true">
+              <circle cx="100" cy="100" r="88" fill="none" stroke="#202226" stroke-width="13"></circle>
+              <circle cx="100" cy="100" r="88" fill="none" stroke="#e8a020" stroke-width="13" stroke-linecap="round" stroke-dasharray="553" stroke-dashoffset="210" transform="rotate(-90 100 100)"></circle>
+              <circle cx="100" cy="100" r="68" fill="none" stroke="#202226" stroke-width="13"></circle>
+              <circle cx="100" cy="100" r="68" fill="none" stroke="#7fd14b" stroke-width="13" stroke-linecap="round" stroke-dasharray="427" stroke-dashoffset="0" transform="rotate(-90 100 100)"></circle>
+            </svg>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;color:#e8a020">YOU</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:56px;font-weight:700;letter-spacing:-2px;line-height:1">0:56</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8b9196">set 3 next</span>
+            </div>
+          </div>
+
+          <div style="width:100%;background:#1d2a12;border:1px solid #7fd14b;border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;margin-top:4px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:#7fd14b">GO</span>
+            <div style="display:flex;flex-direction:column">
+              <span style="font-size:15px;font-weight:700;color:#7fd14b">Mette's turn</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9aa0a6">rest done 0:12 ago · set 3 of 3</span>
+            </div>
+            <button style="margin-left:auto;background:#7fd14b;border:none;color:#0a0a0b;border-radius:10px;padding:12px 14px;font-family:'Sora',sans-serif;font-size:13px;font-weight:700">Log hers</button>
+          </div>
+
+          <div style="display:flex;gap:8px;width:100%;margin-top:6px">
+            <button style="flex:1;background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:10px;padding:14px 0;font-family:'JetBrains Mono',monospace;font-size:14px">−15s</button>
+            <button style="flex:1;background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:10px;padding:14px 0;font-family:'Sora',sans-serif;font-size:14px;font-weight:600">Pause</button>
+            <button style="flex:1;background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:10px;padding:14px 0;font-family:'JetBrains Mono',monospace;font-size:14px">+15s</button>
+          </div>
+          <button style="width:100%;background:#e8a020;border:none;color:#0a0a0b;border-radius:12px;min-height:58px;font-family:'Sora',sans-serif;font-size:16px;font-weight:700;margin-top:2px">Skip my rest → set 3</button>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">
+            <span style="background:#17181a;border:1px solid #24262a;border-radius:7px;padding:6px 9px">1 ✓ 60×10</span>
+            <span style="background:#17181a;border:1px solid #24262a;border-radius:7px;padding:6px 9px">2 ✓ 60×10</span>
+            <span style="padding:6px 0">3 —</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;padding:12px 14px 16px;background:#131416;border-top:1px solid #2c2f34">
+          <button style="flex:1;background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:11px;min-height:52px;font-family:'Sora',sans-serif;font-size:15px;font-weight:600">Prev</button>
+          <button style="flex:2;background:#202226;border:1px solid #2c2f34;color:#9aa0a6;border-radius:11px;min-height:52px;font-family:'Sora',sans-serif;font-size:15px;font-weight:600">Next exercise →</button>
+        </div>
+      </div>
+
+      <div style="background:#131416;border:1px solid #2c2f34;border-radius:14px;padding:14px;display:flex;gap:14px;align-items:center">
+        <svg viewBox="0 0 200 200" style="width:88px;height:88px;flex-shrink:0" aria-hidden="true">
+          <circle cx="100" cy="100" r="80" fill="none" stroke="#202226" stroke-width="26"></circle>
+          <circle cx="100" cy="100" r="80" fill="none" stroke="#e8a020" stroke-width="26" stroke-linecap="butt" stroke-dasharray="251 251" stroke-dashoffset="126" transform="rotate(-90 100 100)"></circle>
+          <circle cx="100" cy="100" r="80" fill="none" stroke="#7fd14b" stroke-width="26" stroke-linecap="butt" stroke-dasharray="126 377" stroke-dashoffset="0" transform="rotate(-90 100 100)"></circle>
+        </svg>
+        <p style="margin:0;font-size:12px;line-height:1.6;color:#9aa0a6">Together mode: one thick ring, both colours, one number. Nobody has to read two clocks when the rest is shared.</p>
+      </div>
+    </div>
+
+    <!-- ══════════ 1c ══════════ -->
+    <div id="1c" style="display:flex;flex-direction:column;gap:14px;width:390px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#0a0a0b;background:#e8a020;border-radius:6px;padding:3px 8px">1c</span>
+        <span style="font-size:17px;font-weight:700">Relay rows</span>
+      </div>
+      <p style="margin:0;font-size:13px;line-height:1.6;color:#9aa0a6;text-wrap:pretty">No overlay at all. The exercise is two equal rows and each row is a state machine: <em>ready → logging → resting</em>. Whoever is ready expands and shows the inputs; the other row collapses to a countdown. Turn-taking is the layout, so a session on one phone reads like a relay — and either person can log without hunting for a proxy toggle.</p>
+
+      <div style="width:390px;height:844px;background:#0d0d0e;border:1px solid #2c2f34;border-radius:28px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;padding:14px 14px 12px;background:#131416;border-bottom:1px solid #2c2f34">
+          <button style="background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:9px;padding:8px 12px;font-family:'Sora',sans-serif;font-size:13px;font-weight:600">Overview</button>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9aa0a6">3/9</span>
+          <div style="flex:1;height:4px;background:#202226;border-radius:2px;overflow:hidden">
+            <div style="width:33%;height:100%;background:#e8a020"></div>
+          </div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9aa0a6">18:04</span>
+        </div>
+
+        <div style="flex:1;display:flex;flex-direction:column;gap:12px;padding:16px 14px;overflow:hidden">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <div style="font-size:26px;font-weight:700;letter-spacing:-0.6px">Leg Press</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#9aa0a6">3×10</div>
+            <button style="margin-left:auto;background:none;border:1px solid #2c2f34;color:#9aa0a6;border-radius:8px;padding:6px 10px;font-family:'Sora',sans-serif;font-size:12px;font-weight:600">▶ Form</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">
+            <span style="background:#3a2a06;color:#e8a020;border-radius:6px;padding:5px 9px;letter-spacing:0.06em">TAKING TURNS</span>
+            <span>90s rest · remembered for this exercise</span>
+            <button style="margin-left:auto;background:none;border:none;color:#9aa0a6;font-family:'JetBrains Mono',monospace;font-size:11px">change</button>
+          </div>
+
+          <div style="background:#17181a;border:1px solid #33363c;border-left:3px solid #e8a020;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:15px;font-weight:700;color:#e8a020">You</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9aa0a6">set 3 of 3 · your turn</span>
+              <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">1 ✓ 2 ✓</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <div style="flex:1;background:#0d0d0e;border:1px solid #33363c;border-radius:10px;padding:13px 0;text-align:center;font-family:'JetBrains Mono',monospace;font-size:21px;font-weight:700">62.5<span style="font-size:11px;color:#8b9196;font-weight:400"> kg</span></div>
+              <div style="flex:1;background:#0d0d0e;border:1px solid #33363c;border-radius:10px;padding:13px 0;text-align:center;font-family:'JetBrains Mono',monospace;font-size:21px;font-weight:700">10<span style="font-size:11px;color:#8b9196;font-weight:400"> reps</span></div>
+              <div style="width:78px;background:#0d0d0e;border:1px solid #2c2f34;border-radius:10px;padding:13px 0;text-align:center;font-family:'JetBrains Mono',monospace;font-size:21px;font-weight:500;color:#8b9196">RIR</div>
+            </div>
+            <button style="width:100%;min-height:62px;background:#e8a020;color:#0a0a0b;border:none;border-radius:12px;font-family:'Sora',sans-serif;font-size:17px;font-weight:700">✓ Done — hand over</button>
+          </div>
+
+          <div style="background:#131416;border:1px solid #2c2f34;border-left:3px solid #7fd14b;border-radius:16px;padding:14px;display:flex;align-items:center;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="font-size:15px;font-weight:700;color:#7fd14b">Mette</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9aa0a6">resting · set 3 next</span>
+            </div>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+              <div style="width:70px;height:8px;background:#202226;border-radius:4px;overflow:hidden">
+                <div style="width:35%;height:100%;background:#7fd14b;border-radius:4px"></div>
+              </div>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:#7fd14b">0:31</span>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px;padding:2px 4px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">Her last: 55kg ×10 ×10</span>
+            <button style="margin-left:auto;background:#202226;border:1px solid #2c2f34;color:#9aa0a6;border-radius:8px;padding:7px 11px;font-family:'Sora',sans-serif;font-size:12px;font-weight:600">Rest together instead</button>
+          </div>
+
+          <div style="margin-top:auto;background:#131416;border:1px solid #2c2f34;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#8b9196">UP NEXT</span>
+              <span style="font-size:14px;font-weight:600">Single-Arm Dumbbell Row</span>
+            </div>
+            <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">3×10/side</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;padding:12px 14px 16px;background:#131416;border-top:1px solid #2c2f34">
+          <button style="flex:1;background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:11px;min-height:52px;font-family:'Sora',sans-serif;font-size:15px;font-weight:600">Prev</button>
+          <button style="flex:2;background:#202226;border:1px solid #2c2f34;color:#9aa0a6;border-radius:11px;min-height:52px;font-family:'Sora',sans-serif;font-size:15px;font-weight:600">Next exercise →</button>
+        </div>
+      </div>
+
+      <div style="background:#131416;border:1px solid #2c2f34;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#e8a020">TOGETHER MODE</div>
+        <div style="display:flex;align-items:center;gap:10px;background:#0d0d0e;border:1px solid #33363c;border-radius:12px;padding:12px">
+          <span style="font-size:13px;font-weight:600">You + Mette</span>
+          <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700">1:29</span>
+        </div>
+        <p style="margin:0;font-size:12px;line-height:1.6;color:#9aa0a6">The two rows merge into one card with a single clock, and both sets are logged from it before the rest starts.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 1d — shared fixes ══════════ -->
+  <div id="1d" style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#0a0a0b;background:#e8a020;border-radius:6px;padding:3px 8px">1d</span>
+      <span style="font-size:22px;font-weight:700">Per-side sets, and re-opening a rep</span>
+    </div>
+    <p style="margin:0;max-width:760px;font-size:14px;line-height:1.6;color:#9aa0a6;text-wrap:pretty">Applies to whichever layout you pick. A /side set is one set with two holds: left, a hand-over step, then right. The set only ticks when both sides are logged, and a finished set always keeps a restart button, so re-opening never leaves you without a timer.</p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:16px">
+      <div style="width:300px;background:#0d0d0e;border:1px solid #2c2f34;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#8b9196">STEP 1 · LEFT</div>
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:20px;font-weight:700">Side Plank</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#9aa0a6">2×30/side</span></div>
+        <div style="display:flex;gap:6px">
+          <div style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:#3a2a06;color:#e8a020;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700">LEFT</div>
+          <div style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:#17181a;color:#8b9196;font-family:'JetBrains Mono',monospace;font-size:12px">RIGHT</div>
+        </div>
+        <button style="width:100%;min-height:62px;background:#e8a020;border:none;color:#0a0a0b;border-radius:12px;font-family:'Sora',sans-serif;font-size:17px;font-weight:700">▶ Start left · 30s</button>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">set 1 of 2 · 0 of 2 sides logged</div>
+      </div>
+
+      <div style="width:300px;background:#0d0d0e;border:1px solid #33363c;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#e8a020">STEP 2 · SWITCH SIDES</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:34px;font-weight:700;color:#e8a020">30s</span>
+          <span style="font-size:13px;color:#9aa0a6;line-height:1.4">left logged<br>now the other side</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <div style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:#17181a;color:#9aa0a6;font-family:'JetBrains Mono',monospace;font-size:12px">LEFT ✓ 30s</div>
+          <div style="flex:1;text-align:center;padding:9px 0;border-radius:8px;background:#3a2a06;color:#e8a020;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700">RIGHT</div>
+        </div>
+        <button style="width:100%;min-height:62px;background:#e8a020;border:none;color:#0a0a0b;border-radius:12px;font-family:'Sora',sans-serif;font-size:17px;font-weight:700">▶ Start right · 30s</button>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">no rest until both sides are done</div>
+      </div>
+
+      <div style="width:300px;background:#0d0d0e;border:1px solid #2c2f34;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#8b9196">RE-OPENED SET</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:10px;background:#17181a;border:1px solid #24262a;border-radius:12px;padding:12px 14px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8b9196;width:52px">LEFT</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700">30s</span>
+            <button style="margin-left:auto;background:#202226;border:1px solid #33363c;color:#ecedee;border-radius:9px;padding:10px 12px;font-family:'Sora',sans-serif;font-size:12px;font-weight:600">↻ Redo</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;background:#17181a;border:1px solid #24262a;border-radius:12px;padding:12px 14px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8b9196;width:52px">RIGHT</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700">26s</span>
+            <button style="margin-left:auto;background:#202226;border:1px solid #33363c;color:#ecedee;border-radius:9px;padding:10px 12px;font-family:'Sora',sans-serif;font-size:12px;font-weight:600">↻ Redo</button>
+          </div>
+        </div>
+        <p style="margin:0;font-size:12px;line-height:1.6;color:#9aa0a6">Logged values stay visible and editable; ↻ Redo re-arms the countdown for that side only and overwrites just that number.</p>
+      </div>
+
+      <div style="width:300px;background:#0d0d0e;border:1px solid #2c2f34;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#8b9196">REST MODE MEMORY</div>
+        <p style="margin:0;font-size:13px;line-height:1.6;color:#9aa0a6">Each exercise remembers together/turns locally, so you only choose once. First time on an exercise it defaults from the plan: timed holds and core work start as <em>together</em>, loaded machine and bench work as <em>turns</em>.</p>
+        <div style="display:flex;flex-direction:column;gap:6px;font-family:'JetBrains Mono',monospace;font-size:12px">
+          <div style="display:flex;gap:8px;align-items:center;background:#17181a;border:1px solid #24262a;border-radius:10px;padding:10px 12px"><span style="flex:1;color:#ecedee">leg press</span><span style="color:#e8a020">turns · 90s</span></div>
+          <div style="display:flex;gap:8px;align-items:center;background:#17181a;border:1px solid #24262a;border-radius:10px;padding:10px 12px"><span style="flex:1;color:#ecedee">side plank</span><span style="color:#7fd14b">together · 45s</span></div>
+          <div style="display:flex;gap:8px;align-items:center;background:#17181a;border:1px solid #24262a;border-radius:10px;padding:10px 12px"><span style="flex:1;color:#ecedee">lat pulldown</span><span style="color:#e8a020">turns · 90s</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 1e — overview + today ══════════ -->
+  <div id="1e" style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#0a0a0b;background:#e8a020;border-radius:6px;padding:3px 8px">1e</span>
+      <span style="font-size:22px;font-weight:700">Overview and today</span>
+    </div>
+    <p style="margin:0;max-width:760px;font-size:14px;line-height:1.6;color:#9aa0a6;text-wrap:pretty">One direction for both, not three. The overview stops being a second logging surface: it becomes the start line — who is training, what the warm-up is, the exercise order to drag, and one big start. Logging happens in focus mode.</p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:40px">
+      <div style="width:390px;height:844px;background:#0d0d0e;border:1px solid #2c2f34;border-radius:28px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;padding:14px;background:#131416;border-bottom:1px solid #2c2f34">
+          <span style="font-size:17px;font-weight:800;color:#e8a020;letter-spacing:-0.3px">Let's Get Buff</span>
+          <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">v41 · e668526</span>
+          <span style="background:#202226;border:1px solid #2c2f34;border-radius:999px;padding:5px 10px;font-family:'JetBrains Mono',monospace;font-size:11px">E-ink</span>
+        </div>
+        <div style="flex:1;padding:16px 14px;display:flex;flex-direction:column;gap:12px;overflow:hidden">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span style="font-size:28px;font-weight:800;letter-spacing:-0.8px">Workout B</span>
+            <span style="font-size:15px;color:#9aa0a6">Pull &amp; Quad</span>
+          </div>
+          <div style="display:flex;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#9aa0a6">
+            <span style="background:#17181a;border:1px solid #24262a;border-radius:7px;padding:6px 9px">SAT 29.08</span>
+            <span style="background:#17181a;border:1px solid #24262a;border-radius:7px;padding:6px 9px">WEEK 1/26</span>
+            <span style="background:#17181a;border:1px solid #24262a;border-radius:7px;padding:6px 9px">8 EXERCISES</span>
+          </div>
+
+          <div style="background:#131416;border:1px solid #2c2f34;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#8b9196">TRAINING</span>
+            <span style="background:#3a2a06;color:#e8a020;border-radius:999px;padding:6px 11px;font-size:12px;font-weight:700">You</span>
+            <span style="background:#1d2a12;color:#7fd14b;border-radius:999px;padding:6px 11px;font-size:12px;font-weight:700">Mette</span>
+            <button style="margin-left:auto;background:none;border:none;color:#9aa0a6;font-family:'JetBrains Mono',monospace;font-size:11px">change</button>
+          </div>
+
+          <div style="background:#131416;border:1px solid #2c2f34;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#8b9196">WARM-UP · 11 MIN</span>
+              <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">0/4</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <div style="flex:1;background:#17181a;border:1px solid #24262a;border-radius:10px;padding:10px 8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">5:00</div><div style="font-size:10px;color:#8b9196">row</div></div>
+              <div style="flex:1;background:#17181a;border:1px solid #24262a;border-radius:10px;padding:10px 8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">0:30</div><div style="font-size:10px;color:#8b9196">plank</div></div>
+              <div style="flex:1;background:#17181a;border:1px solid #24262a;border-radius:10px;padding:10px 8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">5:00</div><div style="font-size:10px;color:#8b9196">row</div></div>
+              <div style="flex:1;background:#17181a;border:1px solid #24262a;border-radius:10px;padding:10px 8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">0:30</div><div style="font-size:10px;color:#8b9196">plank</div></div>
+            </div>
+          </div>
+
+          <button style="width:100%;min-height:66px;background:#e8a020;border:none;color:#0a0a0b;border-radius:14px;font-family:'Sora',sans-serif;font-size:19px;font-weight:800">▶ Start session</button>
+
+          <div style="display:flex;align-items:center;gap:8px;padding:2px 2px">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#8b9196">ORDER</span>
+            <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">drag · live with Mette</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:10px;background:#17181a;border:1px solid #24262a;border-radius:12px;padding:12px 14px">
+              <span style="color:#7c8288;font-size:15px">⠿</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8b9196">1</span>
+              <span style="font-size:14px;font-weight:600">Leg Press</span>
+              <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">3×10 · turns</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;background:#17181a;border:1px solid #24262a;border-radius:12px;padding:12px 14px">
+              <span style="color:#7c8288;font-size:15px">⠿</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8b9196">2</span>
+              <span style="font-size:14px;font-weight:600">Single-Arm Dumbbell Row</span>
+              <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">3×10/s</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;background:#17181a;border:1px solid #24262a;border-radius:12px;padding:12px 14px">
+              <span style="color:#7c8288;font-size:15px">⠿</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8b9196">3</span>
+              <span style="font-size:14px;font-weight:600">Lat Pulldown</span>
+              <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">3×10 · turns</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;background:#17181a;border:1px solid #24262a;border-radius:12px;padding:12px 14px">
+              <span style="color:#7c8288;font-size:15px">⠿</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8b9196">4</span>
+              <span style="font-size:14px;font-weight:600">Dumbbell Curl</span>
+              <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">2×12</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;background:#17181a;border:1px solid #24262a;border-radius:12px;padding:12px 14px;opacity:0.55">
+              <span style="color:#7c8288;font-size:15px">⠿</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#8b9196">5</span>
+              <span style="font-size:14px;font-weight:600">Overhead Tricep Extension</span>
+              <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">2×12</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;background:#131416;border-top:1px solid #2c2f34;padding:8px 4px 14px">
+          <div style="flex:1;text-align:center;font-size:11px;color:#8b9196;padding:8px 0">Home</div>
+          <div style="flex:1;text-align:center;font-size:11px;color:#e8a020;font-weight:700;padding:8px 0">Workout</div>
+          <div style="flex:1;text-align:center;font-size:11px;color:#8b9196;padding:8px 0">Stretch</div>
+          <div style="flex:1;text-align:center;font-size:11px;color:#8b9196;padding:8px 0">At home</div>
+          <div style="flex:1;text-align:center;font-size:11px;color:#8b9196;padding:8px 0">History</div>
+          <div style="flex:1;text-align:center;font-size:11px;color:#8b9196;padding:8px 0">More</div>
+        </div>
+      </div>
+
+      <div style="width:390px;height:844px;background:#0d0d0e;border:1px solid #2c2f34;border-radius:28px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;padding:14px;background:#131416;border-bottom:1px solid #2c2f34">
+          <span style="font-size:17px;font-weight:800;color:#e8a020;letter-spacing:-0.3px">Let's Get Buff</span>
+          <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">Week 1/26</span>
+        </div>
+        <div style="flex:1;padding:16px 14px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.12em;color:#8b9196">SATURDAY 29 AUGUST</div>
+          <div style="background:#17181a;border:1px solid #33363c;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:baseline;gap:10px">
+              <span style="font-size:30px;font-weight:800;letter-spacing:-0.8px">Workout B</span>
+              <span style="font-size:14px;color:#9aa0a6">Pull &amp; Quad</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="background:#3a2a06;color:#e8a020;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700">You</span>
+              <span style="background:#1d2a12;color:#7fd14b;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700">Mette</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">~55 min</span>
+            </div>
+            <button style="width:100%;min-height:64px;background:#e8a020;border:none;color:#0a0a0b;border-radius:13px;font-family:'Sora',sans-serif;font-size:18px;font-weight:800">▶ Start Workout B</button>
+          </div>
+
+          <div style="display:flex;gap:10px">
+            <div style="flex:1;background:#131416;border:1px solid #2c2f34;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px">
+              <span style="font-size:14px;font-weight:600">Stretch</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">optional · 12 min</span>
+              <button style="margin-top:2px;background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:10px;padding:11px 0;font-family:'Sora',sans-serif;font-size:13px;font-weight:600">Open</button>
+            </div>
+            <div style="flex:1;background:#131416;border:1px solid #2c2f34;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px">
+              <span style="font-size:14px;font-weight:600">Home circuit</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">~13 min · no kit</span>
+              <button style="margin-top:2px;background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:10px;padding:11px 0;font-family:'Sora',sans-serif;font-size:13px;font-weight:600">Start</button>
+            </div>
+          </div>
+
+          <div style="background:#131416;border:1px solid #2c2f34;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#8b9196">THIS WEEK</span>
+              <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b9196">1 of 2 done</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">
+              <div style="background:#17181a;border:1px solid #24262a;border-radius:9px;padding:9px 0;text-align:center"><div style="font-size:10px;color:#8b9196">M</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#7c8288">·</div></div>
+              <div style="background:#17181a;border:1px solid #24262a;border-radius:9px;padding:9px 0;text-align:center"><div style="font-size:10px;color:#8b9196">T</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#9aa0a6">A ✓</div></div>
+              <div style="background:#17181a;border:1px solid #24262a;border-radius:9px;padding:9px 0;text-align:center"><div style="font-size:10px;color:#8b9196">W</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#7c8288">·</div></div>
+              <div style="background:#17181a;border:1px solid #24262a;border-radius:9px;padding:9px 0;text-align:center"><div style="font-size:10px;color:#8b9196">T</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#7c8288">·</div></div>
+              <div style="background:#17181a;border:1px solid #24262a;border-radius:9px;padding:9px 0;text-align:center"><div style="font-size:10px;color:#8b9196">F</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#7c8288">·</div></div>
+              <div style="background:#3a2a06;border:1px solid #e8a020;border-radius:9px;padding:9px 0;text-align:center"><div style="font-size:10px;color:#e8a020">S</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#e8a020;font-weight:700">B</div></div>
+              <div style="background:#17181a;border:1px solid #24262a;border-radius:9px;padding:9px 0;text-align:center"><div style="font-size:10px;color:#8b9196">S</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#7c8288">·</div></div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;background:#131416;border:1px solid #2c2f34;border-radius:14px;padding:12px 14px">
+            <span style="font-size:13px;color:#9aa0a6">Add a run, ride or rest day</span>
+            <button style="margin-left:auto;background:#202226;border:1px solid #2c2f34;color:#ecedee;border-radius:9px;padding:9px 12px;font-family:'Sora',sans-serif;font-size:13px;font-weight:600">+ Add</button>
+          </div>
+        </div>
+        <div style="display:flex;background:#131416;border-top:1px solid #2c2f34;padding:8px 4px 14px">
+          <div style="flex:1;text-align:center;font-size:11px;color:#e8a020;font-weight:700;padding:8px 0">Home</div>
+          <div style="flex:1;text-align:center;font-size:11px;color:#8b9196;padding:8px 0">Workout</div>
+          <div style="flex:1;text-align:center;font-size:11px;color:#8b9196;padding:8px 0">Stretch</div>
+          <div style="flex:1;text-align:center;font-size:11px;color:#8b9196;padding:8px 0">At home</div>
+          <div style="flex:1;text-align:center;font-size:11px;color:#8b9196;padding:8px 0">History</div>
+          <div style="flex:1;text-align:center;font-size:11px;color:#8b9196;padding:8px 0">More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 1f — e-ink ══════════ -->
+  <div id="1f" style="display:flex;flex-direction:column;gap:20px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#0a0a0b;background:#e8a020;border-radius:6px;padding:3px 8px">1f</span>
+      <span style="font-size:22px;font-weight:700">E-ink check</span>
+    </div>
+    <p style="margin:0;max-width:760px;font-size:14px;line-height:1.6;color:#9aa0a6;text-wrap:pretty">Both people still have to be distinguishable with no colour. Identity moves to a label and a fill: you are solid black, your partner is hatched, and the countdown is the largest thing on screen. Same layout, no rings, no gradients, no motion.</p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:24px">
+      <div style="width:390px;height:640px;background:#ffffff;border:2px solid #000;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;color:#000">
+        <div style="display:flex;align-items:center;gap:10px;padding:14px;border-bottom:2px solid #000">
+          <span style="border:2px solid #000;border-radius:4px;padding:8px 12px;font-size:14px;font-weight:700">OVERVIEW</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">3/9</span>
+          <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:15px">18:04</span>
+        </div>
+        <div style="flex:1;padding:16px;display:flex;flex-direction:column;gap:14px">
+          <div style="font-size:26px;font-weight:800">Leg Press <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:500">3×10</span></div>
+          <div style="border:2px solid #000;border-radius:6px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700">TAKING TURNS · 90s</div>
+
+          <div style="border:2px solid #000;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px;background:#000;color:#fff">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;letter-spacing:0.08em">YOU · RESTING</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:64px;font-weight:700;line-height:1">0:56</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px">set 3 of 3 next</div>
+          </div>
+
+          <div style="border:2px solid #000;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:8px;background:repeating-linear-gradient(135deg,#fff,#fff 6px,#e2e2e2 6px,#e2e2e2 12px)">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;letter-spacing:0.08em">METTE</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:40px;font-weight:700;line-height:1">GO NOW</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px">rest finished 0:12 ago</div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:auto">
+            <button style="flex:1;border:2px solid #000;background:#fff;color:#000;border-radius:6px;min-height:56px;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">−15s</button>
+            <button style="flex:1;border:2px solid #000;background:#fff;color:#000;border-radius:6px;min-height:56px;font-family:'Sora',sans-serif;font-size:15px;font-weight:700">PAUSE</button>
+            <button style="flex:1;border:2px solid #000;background:#fff;color:#000;border-radius:6px;min-height:56px;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">+15s</button>
+          </div>
+          <button style="border:2px solid #000;background:#000;color:#fff;border-radius:6px;min-height:60px;font-family:'Sora',sans-serif;font-size:17px;font-weight:800">SKIP REST → SET 3</button>
+        </div>
+      </div>
+
+      <div style="width:300px;background:#0d0d0e;border:1px solid #2c2f34;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;color:#8b9196">RULES CARRIED OVER</div>
+        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;color:#9aa0a6">
+          <li>Person identity = label + fill (solid vs hatched), never hue.</li>
+          <li>No rings; the countdown is type, at 56–64px.</li>
+          <li>Every control is a 2px-bordered box, min 56px tall.</li>
+          <li>State words spelled out: RESTING, GO NOW, DONE.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</section>
+</x-dc>
+</body>
+</html>

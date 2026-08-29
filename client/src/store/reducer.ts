@@ -4,7 +4,7 @@ export type Action =
   | { type: 'SET_START_DATE'; date: string }
   | { type: 'SKIP_WEEK'; weekKey: string }
   | { type: 'UNSKIP_WEEK'; weekKey: string }
-  | { type: 'MARK_DAY_DONE'; date: string; workout: Session['workout'] }
+  | { type: 'MARK_DAY_DONE'; date: string; workout: Session['workout']; durationSec?: number }
   | { type: 'UNMARK_DAY_DONE'; date: string }
   | { type: 'LOG_EXERCISE'; date: string; exerciseId: string; entry: ExerciseEntry }
   | { type: 'LOG_SET'; date: string; exerciseId: string; setIndex: number; set: SetEntry }
@@ -36,7 +36,14 @@ export function reducer(state: AppState, action: Action): AppState {
         ...state,
         sessions: {
           ...state.sessions,
-          [action.date]: { ...existing, workout: action.workout, done: true },
+          // A duration is only written when one was measured; marking a day
+          // done without it must never wipe a duration already recorded.
+          [action.date]: {
+            ...existing,
+            workout: action.workout,
+            done: true,
+            ...(action.durationSec !== undefined ? { durationSec: action.durationSec } : {}),
+          },
         },
       }
     }

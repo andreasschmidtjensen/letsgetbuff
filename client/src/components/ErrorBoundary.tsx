@@ -1,4 +1,5 @@
 import { Component, ErrorInfo, ReactNode } from 'react'
+import { UI_V2_KEY } from '../store/uiVersion'
 
 interface Props {
   children: ReactNode
@@ -29,6 +30,12 @@ export default class ErrorBoundary extends Component<Props, State> {
     const { error } = this.state
     if (!error) return this.props.children
 
+    // The boundary sits above every provider, so it reads the flag straight from
+    // localStorage. If the beta screens are what crashed, a reload alone would
+    // land right back in them — offer the way out.
+    let onV2 = false
+    try { onV2 = localStorage.getItem(UI_V2_KEY) === '1' } catch { /* storage blocked */ }
+
     return (
       <div
         role="alert"
@@ -54,6 +61,21 @@ export default class ErrorBoundary extends Component<Props, State> {
         >
           Reload the app
         </button>
+        {onV2 && (
+          <button
+            onClick={() => {
+              try { localStorage.setItem(UI_V2_KEY, '0') } catch { /* storage blocked */ }
+              window.location.reload()
+            }}
+            style={{
+              padding: '12px 24px', fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              borderRadius: 8, background: 'transparent', color: 'var(--text, #e0e0e0)',
+              border: '1px solid var(--border, #333)',
+            }}
+          >
+            Switch back to the classic workout screen
+          </button>
+        )}
         <pre
           style={{
             maxWidth: '90vw', overflowX: 'auto', fontSize: 12,

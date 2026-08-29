@@ -11,7 +11,7 @@ import ApiKeyCard from '../components/settings/ApiKeyCard'
 import AdminUsersCard from '../components/settings/AdminUsersCard'
 import GithubConnectCard, { GithubStatus } from '../components/settings/GithubConnectCard'
 import GithubClientIdCard from '../components/settings/GithubClientIdCard'
-import { RestTimerCard, TimerSoundCard, TestModeCard } from '../components/settings/preferenceCards'
+import { RestTimerCard, TimerSoundCard, TestModeCard, UiVersionCard } from '../components/settings/preferenceCards'
 
 interface Props {
   onLogout?: () => void
@@ -202,6 +202,9 @@ export default function SettingsView({ onLogout, level }: Props = {}) {
           <p style={{ color: 'var(--green)', fontSize: 13, marginTop: 8 }}>Data imported and synced to server.</p>
         )}
       </div>}
+
+      {/* New workout screens (v2) */}
+      <UiVersionCard />
 
       {/* Rest timer */}
       <RestTimerCard />

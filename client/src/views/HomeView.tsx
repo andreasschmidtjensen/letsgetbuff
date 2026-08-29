@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import { useStore } from '../store/store'
 import { useEinkMode } from '../store/einkMode'
+import { useUiVersion } from '../store/uiVersion'
+import TodayCardV2, { WeekCell } from '../components/workout/v2/TodayCardV2'
 import HomeWorkout from '../components/HomeWorkout'
 import { preloadTimerSounds } from '../lib/sounds'
 import { computeProgramWeek, phaseFor, scheduleFor, isoWeekKey, weekKeyToMonday, todayDayName, activityLabel, DayActivity, homeWorkoutMinutes } from '@letsgetbuff/shared'
@@ -134,6 +136,7 @@ function AddActivity({ date, onNavigate }: { date: string; onNavigate: (tab: Tab
 export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const { state, dispatch } = useStore()
   const { einkMode } = useEinkMode()
+  const { v2 } = useUiVersion()
   const today = new Date()
   const todayStr = dateKey(today)
   const currentWeekKey = isoWeekKey(today)
@@ -364,6 +367,56 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
       )}
 
       {/* Today's activity */}
+      {v2 ? (
+        <TodayCardV2
+          dateCaption={today.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}
+          title={activityLabel(todayDisplayActivity)}
+          subtitle={todayActivity === 'gym-a' || todayActivity === 'gym-b' ? `Week ${programWeek} · ${phaseLabel}` : phaseLabel}
+          estimate={todayActivity === 'gym-a' || todayActivity === 'gym-b' ? '~55 min' : undefined}
+          done={Boolean(todaySession?.done)}
+          primaryLabel={
+            todayActivity === 'gym-a' || todayActivity === 'gym-b'
+              ? `▶ Start Workout ${todayActivity === 'gym-a' ? 'A' : 'B'}`
+              : todayActivity === 'rest' ? 'Mark rest day' : null
+          }
+          onPrimary={() => {
+            if (todayActivity === 'rest') dispatch({ type: 'MARK_DAY_DONE', date: todayStr, workout: 'rest' })
+            else onNavigate('workout')
+          }}
+          onUndo={() => dispatch({ type: 'UNMARK_DAY_DONE', date: todayStr })}
+          stretchDone={stretchDoneToday}
+          onStretch={() => onNavigate('stretch')}
+          homeDone={homeDoneToday}
+          homeMinutes={homeWorkoutMinutes()}
+          onHome={startHomeWorkout}
+          weekDoneLabel={`${DAY_KEYS.filter((_, i) => state.sessions[dateKey(addDays(weekKeyToMonday(currentWeekKey), i))]?.done).length} of ${DAY_KEYS.filter(dk => schedule[dk] === 'gym-a' || schedule[dk] === 'gym-b').length} done`}
+          week={DAY_KEYS.map((dk, i): WeekCell => {
+            const cellKey = dateKey(addDays(weekKeyToMonday(currentWeekKey), i))
+            const sess = state.sessions[cellKey]
+            const act = sess ? sessionActivity(sess.workout) : schedule[dk]
+            const badge = activityBadge(act)
+            return {
+              initial: DAY_LABELS[i][0],
+              marker: `${badge === '-' ? '·' : badge}${sess?.done ? ' ✓' : ''}`,
+              isToday: cellKey === todayStr,
+            }
+          })}
+          activities={todayActivities.map((a, i) => (
+            <div key={i} className="row gap-8" style={{ alignItems: 'center', fontSize: 13 }}>
+              <span>{activityEntryLabel(a)} ✓</span>
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ marginLeft: 'auto' }}
+                aria-label={`Remove ${activityEntryLabel(a)}`}
+                onClick={() => dispatch({ type: 'REMOVE_ACTIVITY', date: todayStr, index: i })}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          addActivity={<AddActivity date={todayStr} onNavigate={onNavigate} />}
+        />
+      ) : (
       <div className="card">
         <div className="card-title">Today</div>
         <div className="row gap-8 mb-8">
@@ -445,6 +498,7 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
           </div>
         </div>
       </div>
+      )}
 
       {/* Weekly schedule */}
       <div className="card card-wide">

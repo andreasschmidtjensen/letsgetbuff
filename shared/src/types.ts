@@ -20,6 +20,14 @@ export interface SetEntry {
   reps?: number
   seconds?: number
   rir?: number // reps in reserve
+  // Per-side exercises (Side Plank, Pallof Press, Single-Arm Row, Dumbbell
+  // Lunge) log one set as two halves. The outer entry is the LEFT side and
+  // `right` holds the second half in the identical shape. Purely additive and
+  // optional — like ActivityType 'home', it needs no schema bump: old backups
+  // simply lack it, the migration ladder passes it through untouched, and the
+  // classic UI ignores it while still counting one entry per set (two flat
+  // entries per set would have made v1 read "3 of 3" after 1½ sets).
+  right?: SetEntry
 }
 
 export interface ExerciseEntry {
@@ -31,6 +39,12 @@ export interface Session {
   workout: WorkoutType
   done: boolean
   entries: Record<string, ExerciseEntry> // exerciseId -> entry
+  // Wall-clock seconds from "Start session" to "Finish", written once when the
+  // day is marked done. Optional and purely additive — like `SetEntry.right`
+  // and ActivityType 'home', old backups simply lack it and round-trip
+  // untouched, so no schema bump. Absent for every session logged before this
+  // existed, and for one marked done without going through focus mode.
+  durationSec?: number
 }
 
 export interface DayMetric {

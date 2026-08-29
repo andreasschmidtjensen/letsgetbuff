@@ -25,6 +25,11 @@ import { parseWarmup } from '../components/workout/helpers'
 import { SessionTimer, WarmupChecklist } from '../components/workout/timers'
 import { SortableExerciseLogger } from '../components/workout/ExerciseLogger'
 import FocusMode from '../components/workout/FocusMode'
+import WorkoutOverviewV2 from '../components/workout/v2/WorkoutOverviewV2'
+import FocusModeV2 from '../components/workout/v2/FocusModeV2'
+import UiVersionChip from '../components/workout/v2/UiVersionChip'
+import { useUiVersion } from '../store/uiVersion'
+import { getSessionStart, startSessionClock, endSessionClock } from '../components/workout/v2/sessionClock'
 import { computeProgramWeek, scheduleFor, todayDayName, loggedExerciseIds } from '@letsgetbuff/shared'
 import { todayKey, keyToDate } from '@letsgetbuff/shared'
 import { getWorkoutExercises, getWorkout, ExerciseDef, repBandFor } from '@letsgetbuff/shared'
@@ -50,6 +55,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
   // no partner and no live-order WebSocket.
   const guest = isGuestMode()
   const { state, dispatch, syncStatus } = useStore()
+  const { v2 } = useUiVersion()
   const todayStr = todayKey()
   const [dateStr, setDateStr] = useState(todayStr)
   const [focusIndex, setFocusIndex] = useState<number | null>(null)
@@ -62,6 +68,9 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
     return saved ? Number(saved) : null
   })
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null)
+  // v2's clock is persisted, so a reload mid-workout resumes the same elapsed
+  // time instead of restarting at zero. v1 keeps using sessionStartedAt as-is.
+  const [v2StartedAt, setV2StartedAt] = useState<number | null>(null)
 
   // Sync the rest preference when another tab/component updates localStorage
   useEffect(() => {
@@ -127,6 +136,11 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
     setWorkoutType(gymDefault(newDate))
   }
   const session = state.sessions[dateStr]
+
+  // Resume a clock left running for this day+workout (reload, tab switch).
+  useEffect(() => {
+    setV2StartedAt(getSessionStart(dateStr, workoutType))
+  }, [dateStr, workoutType])
   const programWeek = state.startDate
     ? computeProgramWeek(state.startDate, state.skippedWeeks, state.sessions, keyToDate(dateStr))
     : 1
@@ -298,7 +312,37 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
         />
       )}
 
-      {focusIndex !== null && (
+      {focusIndex !== null && v2 && (
+        <FocusModeV2
+          exercises={exercises}
+          startIndex={focusIndex}
+          dateStr={dateStr}
+          programWeek={programWeek}
+          audioCtx={audioCtxRef.current}
+          onAudioCtxInit={initAudio}
+          onClose={() => setFocusIndex(null)}
+          readOnly={readOnly}
+          muted={muted}
+          restDefaultSecs={restDefaultSecs}
+          sessionId={sessionId}
+          workoutType={workoutType}
+          username={username}
+          partnerName={isShared ? partnerName : null}
+          partnerState={isShared ? partnerState : null}
+          refreshPartner={refreshPartner}
+          sendPresence={sendPresence}
+          sessionStartedAt={session?.done ? null : v2StartedAt}
+          onFinish={() => {
+            const elapsed = endSessionClock(dateStr, workoutType)
+            if (!readOnly) {
+              dispatch({ type: 'MARK_DAY_DONE', date: dateStr, workout: workoutType, durationSec: elapsed ?? undefined })
+            }
+            setV2StartedAt(null)
+          }}
+        />
+      )}
+
+      {focusIndex !== null && !v2 && (
         <FocusMode
           exercises={exercises}
           startIndex={focusIndex}
@@ -320,6 +364,41 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
         />
       )}
 
+      {v2 ? (
+        <WorkoutOverviewV2
+          workoutType={workoutType}
+          workoutName={getWorkout(workoutType)?.name ?? ''}
+          dateStr={dateStr}
+          todayStr={todayStr}
+          onDateChange={handleDateChange}
+          onWorkoutTypeChange={setWorkoutType}
+          programWeek={programWeek}
+          exercises={exercises}
+          liveOrder={liveOrder}
+          sensors={sensors}
+          onDragEnd={handleDragEnd}
+          warmup={focusWarmup}
+          warmupText={getWorkout(workoutType)?.warmup}
+          onStart={() => {
+            // The clock used to start only when the server handed back a
+            // session, so a guest (or an offline solo session) got no elapsed
+            // time at all in focus mode. Starting the session is what starts it.
+            setV2StartedAt(startSessionClock(dateStr, workoutType))
+            setFocusIndex(0)
+          }}
+          durationSec={session?.durationSec}
+          username={username}
+          partnerName={isShared ? partnerName : null}
+          onChangeParticipants={() => setShowStartModal(true)}
+          audioCtx={audioCtxRef.current}
+          onAudioCtxInit={initAudio}
+          muted={muted}
+          liveHint={partnerName ? `drag · live with ${partnerName}` : 'drag to reorder'}
+          readOnly={readOnly}
+          done={Boolean(session?.done)}
+          onUndoDone={() => dispatch({ type: 'UNMARK_DAY_DONE', date: dateStr })}
+        />
+      ) : (
       <div className="view-narrow">
         {readOnly && (
           <div className="card mb-12" role="note" style={{ borderColor: 'var(--text-muted)' }}>
@@ -371,6 +450,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
           >
             {muted ? '🔇' : '🔔'}
           </button>
+          <UiVersionChip />
         </div>
 
         {/* Session bar: mode + end-session affordance (Phase 13) + proxy toggle (Phase 16) */}
@@ -519,6 +599,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
           )}
         </div>
       </div>
+      )}
     </>
   )
 }

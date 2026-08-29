@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTestMode } from '../../store/testMode'
+import { useUiVersion } from '../../store/uiVersion'
 import { TIMER_SOUNDS, getTimerSound, setTimerSound, playTimerEnd, preloadTimerSounds, type TimerSound } from '../../lib/sounds'
 
 const REST_SECS_KEY = 'letsgetbuff-rest-secs'
@@ -88,6 +89,29 @@ export function TimerSoundCard() {
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ── New workout screens (v2 UI flag, frontend-only) ────────────────────────────
+
+export function UiVersionCard() {
+  const { v2, setV2 } = useUiVersion()
+  return (
+    <div className="card mb-12" style={v2 ? { borderColor: 'var(--accent)' } : undefined}>
+      <div className="card-title">⚡ New workout screens (beta)</div>
+      <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
+        The redesigned workout and focus screens, with a two-lane rest dock so both of you can
+        rest at once. Your logs are the same either way — switching is instant and safe
+        mid-workout. Only on this device.
+      </p>
+      <button
+        className={`btn btn-sm ${v2 ? 'btn-primary' : 'btn-secondary'}`}
+        onClick={() => setV2(!v2)}
+        aria-pressed={v2}
+      >
+        {v2 ? 'New screens: On' : 'New screens: Off'}
+      </button>
     </div>
   )
 }

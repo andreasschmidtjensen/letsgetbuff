@@ -11,7 +11,7 @@
  * build-arg fed by ${{ github.sha }} in the deploy workflow. Local runs fall
  * back to 'dev'.
  */
-export const APP_VERSION = 43
+export const APP_VERSION = 45
 
 export const GIT_SHA = process.env.GIT_SHA || 'dev'
 
