@@ -1111,15 +1111,20 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 
 .v2-body { flex: 1; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 14px; }
 
-.v2-title-row { display: flex; align-items: flex-start; gap: 10px; }
+.v2-title-row { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
 /* Button row on the right of the title; the explain panel wraps onto its own
    full-width line underneath instead of being squeezed between the buttons. */
 .v2-title-actions {
   margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end;
   gap: 8px; flex: 1;
 }
-.v2-title-actions .explain-panel { flex-basis: 100%; }
+/* Open panel: the whole button column drops to its own full-width line, so the
+   text gets the card's width instead of the narrow column beside the title. */
+.v2-title-actions:has(.explain-panel) { flex-basis: 100%; margin-left: 0; }
+/* order keeps the buttons together on one line, panel underneath them. */
+.v2-title-actions .explain-panel { flex-basis: 100%; order: 1; }
 .v2-title-actions .explain-btn { margin-left: 0; min-width: 48px; }
+.v2-title-actions .v2-form-btn { margin-left: 0; }
 
 .explain-panel {
   margin-top: 8px; padding: 10px 12px;
