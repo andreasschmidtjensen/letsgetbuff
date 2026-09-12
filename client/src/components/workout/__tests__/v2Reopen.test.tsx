@@ -35,7 +35,7 @@ const TIMED: ExerciseDef = {
 
 const PER_SIDE: ExerciseDef = { ...TIMED, id: 'side-plank-test', name: 'Side Plank', perSide: true }
 
-const REPS: ExerciseDef = { ...TIMED, id: 'row-test', name: 'Row', progressionType: 'weight' } as ExerciseDef
+const REPS: ExerciseDef = { ...TIMED, id: 'row-test', name: 'Row', progressionType: 'dumbbell' } as ExerciseDef
 
 let container: HTMLElement
 let root: Root
