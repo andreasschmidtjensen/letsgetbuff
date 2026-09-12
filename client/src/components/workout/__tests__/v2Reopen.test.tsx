@@ -35,6 +35,8 @@ const TIMED: ExerciseDef = {
 
 const PER_SIDE: ExerciseDef = { ...TIMED, id: 'side-plank-test', name: 'Side Plank', perSide: true }
 
+const REPS: ExerciseDef = { ...TIMED, id: 'row-test', name: 'Row', progressionType: 'weight' } as ExerciseDef
+
 let container: HTMLElement
 let root: Root
 
@@ -108,6 +110,30 @@ test('an untouched timed set offers Start, not Redo', () => {
   )
   expect(buttons().some(b => /▶ Start/.test(b.textContent ?? ''))).toBe(true)
   expect(buttons().some(b => /Redo/.test(b.textContent ?? ''))).toBe(false)
+})
+
+test('an untouched exercise opens on set 1 and logs into the first slot', () => {
+  const saved: SetEntry[][] = []
+  render(
+    <ExerciseCardV2
+      exercise={REPS}
+      sets={[]}
+      targetSets={3}
+      targetReps={10}
+      ownerLabel="Set"
+      restMode="turns"
+      shared={false}
+      suggestion={null}
+      onSave={s => saved.push(s)}
+      onSetComplete={() => {}}
+      audioCtx={null}
+      onAudioCtxInit={() => ({}) as AudioContext}
+      muted
+    />,
+  )
+  expect(container.textContent).toContain('SET 1 OF 3')
+  click(buttons().find(b => /Log set 1/.test(b.textContent ?? ''))!)
+  expect(saved.at(-1)).toEqual([{ reps: 10, rir: undefined }])
 })
 
 test('a completed per-side set keeps a Redo on each half', () => {

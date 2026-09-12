@@ -48,7 +48,7 @@ export default function ExerciseCardV2(props: ExerciseCardV2Props) {
   const [timingSet, setTimingSet] = useState<number | null>(null)
   const [draft, setDraft] = useState<{ kg: string; reps: string; rir: string } | null>(null)
 
-  const complete = sets.map(s => setComplete(s, exercise))
+  const complete = Array.from({ length: Math.max(targetSets, sets.length) }, (_, i) => setComplete(sets[i], exercise))
   const firstOpen = complete.findIndex(c => !c)
   const currentIndex = reopened ?? (firstOpen === -1 ? targetSets - 1 : firstOpen)
   const current: SetEntry | undefined = sets[currentIndex]
