@@ -81,9 +81,7 @@ export default function RestDock({ lanes, targetKey, onTarget, youName, showName
         <button className="v2-dock-btn" onClick={() => onAdjust(target.key, 15)} aria-label="Add 15 seconds">+15s</button>
         <button className="v2-dock-btn" onClick={() => onSkip(target.key)} aria-label="Skip rest">Skip</button>
       </div>
-      {lanes.length > 1 && (
-        <div className="v2-dock-hint">controls follow the tapped lane · {laneLabel(target)}</div>
-      )}
+      {lanes.length > 1 && <div className="v2-dock-hint">{laneLabel(target)}</div>}
     </div>
   )
 }

@@ -1214,6 +1214,8 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 .v2-side-reps { display: flex; gap: 8px; align-items: stretch; }
 .v2-side-reps .v2-field { flex: 1; }
 .v2-side-reps .v2-primary { flex: 2; width: auto; }
+/* Together: a labelled reps field per person, then one confirm below. */
+.v2-side-reps .v2-who { align-self: center; width: 68px; flex: none; }
 .v2-side-caption { font-size: 11px; color: var(--text-faint); }
 .v2-side-row {
   display: flex; align-items: center; gap: 10px;
@@ -1245,6 +1247,37 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 }
 .v2-partner-head { display: flex; align-items: center; gap: 8px; }
 .v2-partner-head .v2-header-btn { margin-left: auto; }
+.v2-partner-head .v2-partner-sub { margin-left: auto; margin-top: 0; }
+
+/* Together mode: the partner gets a mirror of what the one card wrote. */
+.v2-partner-mirror {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--partner); border-radius: 12px; padding: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.v2-partner-mirror-note { font-size: 12px; color: var(--text-secondary); }
+/* Whose row of fields this is, in the one-card dual entry. */
+.v2-who {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-faint);
+}
+.v2-who-partner { color: var(--partner); }
+.v2-partner-error {
+  background: var(--accent-dim); color: var(--accent);
+  border-radius: 10px; padding: 10px 12px; font-size: 12px;
+}
+
+/* Resting: the set card logs nothing until the lane is finished or skipped. */
+.v2-resting {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: var(--surface-raised); border: 1px dashed var(--border-strong);
+  border-radius: 12px; padding: 20px 14px; text-align: center;
+}
+.v2-resting-clock {
+  font-family: var(--v2-mono); font-variant-numeric: tabular-nums;
+  font-size: 40px; font-weight: 700; line-height: 1;
+}
+.v2-resting-txt { font-size: 12px; color: var(--text-secondary); }
 
 /* ── Exercise extras (safety, felt easy, notes) ────────────────────────────── */
 .v2-extras { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }

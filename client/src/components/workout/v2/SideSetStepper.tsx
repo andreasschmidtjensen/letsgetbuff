@@ -28,39 +28,63 @@ interface SideSetStepperProps {
   onAudioCtxInit: () => AudioContext
   muted: boolean
   readOnly?: boolean
+  /**
+   * Together mode: the second person's half of the same side. You switch sides
+   * at the same time, so one confirm logs the side for both — each at their own
+   * reps, and on one shared clock when the exercise is timed.
+   */
+  together?: {
+    label: string
+    value: SetEntry | undefined
+    onLogSide: (side: Side, half: SetEntry) => void
+  }
 }
 
 export default function SideSetStepper(props: SideSetStepperProps) {
-  const { exercise, setIndex, totalSets, value, targetSeconds, targetReps, onLogSide, audioCtx, onAudioCtxInit, muted, readOnly } = props
+  const { exercise, setIndex, value, targetSeconds, targetReps, onLogSide, audioCtx, onAudioCtxInit, muted, readOnly, together } = props
   const [timingSide, setTimingSide] = useState<Side | null>(null)
   // Undefined = untouched, so the field falls back to the logged / target reps
   // the same way the non-per-side card does.
   const [reps, setReps] = useState<Partial<Record<Side, string>>>({})
+  const [reps2, setReps2] = useState<Partial<Record<Side, string>>>({})
   // Set while re-timing one already-logged half, so it stays the active side
   // until its new value lands.
   const [redo, setRedo] = useState<Side | null>(null)
 
   const leftDone = sideLogged(value)
   const rightDone = sideLogged(value?.right)
-  const doneCount = (leftDone ? 1 : 0) + (rightDone ? 1 : 0)
   const timed = targetSeconds !== undefined
 
   const half = (side: Side): SetEntry | undefined => (side === 'left' ? value : value?.right)
+
+  const half2 = (side: Side): SetEntry | undefined =>
+    side === 'left' ? together?.value : together?.value?.right
 
   const logTimed = (side: Side, achieved: number) => {
     setTimingSide(null)
     if (readOnly) return
     setRedo(null)
+    // One clock, both logs — you hold the same side at the same time.
+    if (together) together.onLogSide(side, { ...half2(side), seconds: achieved })
     onLogSide(side, { ...half(side), seconds: achieved })
   }
 
   const repsValue = (side: Side): string =>
     reps[side] ?? (half(side)?.reps !== undefined ? String(half(side)!.reps) : targetReps !== undefined ? String(targetReps) : '')
 
+  const reps2Value = (side: Side): string =>
+    reps2[side] ?? (half2(side)?.reps !== undefined ? String(half2(side)!.reps) : targetReps !== undefined ? String(targetReps) : '')
+
   const logReps = (side: Side) => {
     if (readOnly) return
     const n = Number(repsValue(side))
     if (!Number.isFinite(n) || n <= 0) return
+    if (together) {
+      const n2 = Number(reps2Value(side))
+      if (!Number.isFinite(n2) || n2 <= 0) return
+      together.onLogSide(side, { ...half2(side), reps: n2 })
+      setReps2(r => ({ ...r, [side]: undefined }))
+    }
     setRedo(null)
     onLogSide(side, { ...half(side), reps: n })
     setReps(r => ({ ...r, [side]: undefined }))
@@ -120,10 +144,11 @@ export default function SideSetStepper(props: SideSetStepperProps) {
       {timerOverlay}
       {isStepTwo && (
         <div className="v2-side-switch">
-          <div className="v2-side-step">STEP 2 · SWITCH SIDES</div>
           <div className="v2-side-achieved">
-            <span className="v2-side-achieved-num">{formatSide(value, exercise)}</span>
-            <span className="v2-side-achieved-txt">left logged<br />now the other side</span>
+            <span className="v2-side-achieved-num">
+              {formatSide(value, exercise)}
+              {together && <> / {formatSide(together.value, exercise)}</>}
+            </span>
           </div>
         </div>
       )}
@@ -135,8 +160,40 @@ export default function SideSetStepper(props: SideSetStepperProps) {
           disabled={readOnly}
           aria-label={`Start the ${active} side timer for set ${setIndex + 1}`}
         >
-          ▶ Start {active} · {formatDuration(half(active)?.seconds ?? targetSeconds ?? 0)}
+          ▶ Start {active}{together ? ' for both' : ''} · {formatDuration(half(active)?.seconds ?? targetSeconds ?? 0)}
         </button>
+      ) : together ? (
+        <>
+          <div className="v2-side-reps">
+            <span className="v2-who">YOU</span>
+            <input
+              type="number"
+              className="v2-field"
+              inputMode="numeric"
+              min={0}
+              placeholder={String(targetReps ?? '')}
+              value={repsValue(active)}
+              onChange={e => setReps(r => ({ ...r, [active]: e.target.value }))}
+              aria-label={`Reps for the ${active} side`}
+            />
+          </div>
+          <div className="v2-side-reps">
+            <span className="v2-who v2-who-partner">{together.label.toUpperCase()}</span>
+            <input
+              type="number"
+              className="v2-field"
+              inputMode="numeric"
+              min={0}
+              placeholder={String(targetReps ?? '')}
+              value={reps2Value(active)}
+              onChange={e => setReps2(r => ({ ...r, [active]: e.target.value }))}
+              aria-label={`Reps for the ${active} side for ${together.label}`}
+            />
+          </div>
+          <button className="v2-primary" onClick={() => logReps(active)} disabled={readOnly}>
+            ✓ Log {active} for both
+          </button>
+        </>
       ) : (
         <div className="v2-side-reps">
           <input
@@ -154,12 +211,7 @@ export default function SideSetStepper(props: SideSetStepperProps) {
           </button>
         </div>
       )}
-      <div className="v2-side-caption">
-        {redo
-          ? `redoing the ${redo} side · only that value changes`
-          : `set ${setIndex + 1} of ${totalSets} · ${doneCount} of 2 sides logged`}
-        {!redo && doneCount === 1 ? ' · no rest until both sides are done' : ''}
-      </div>
+      {redo && <div className="v2-side-caption">redoing {redo}</div>}
     </div>
   )
 }

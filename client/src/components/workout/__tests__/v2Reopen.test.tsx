@@ -178,7 +178,8 @@ test('a half-logged per-side set asks for the other side, not for rest', () => {
       muted
     />,
   )
-  expect(container.textContent).toContain('SWITCH SIDES')
-  expect(container.textContent).toContain('no rest until both sides are done')
+  // The logged half is shown and the right side is the one on offer — a
+  // half-logged set never completes, so no rest is started.
+  expect(container.textContent).toContain('30s')
   expect(buttons().some(b => /Start right/.test(b.textContent ?? ''))).toBe(true)
 })

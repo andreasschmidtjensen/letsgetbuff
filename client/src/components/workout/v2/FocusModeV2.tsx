@@ -62,6 +62,10 @@ export default function FocusModeV2(props: FocusModeV2Props) {
   const [showVideo, setShowVideo] = useState(false)
   const [partnerOpen, setPartnerOpen] = useState(false)
   const [targetLane, setTargetLane] = useState<string | null>(null)
+  // Optimistic partner sets + the reason a proxy write failed. Both are scoped to
+  // the focused exercise.
+  const [partnerPending, setPartnerPending] = useState<SetEntry[] | null>(null)
+  const [partnerError, setPartnerError] = useState<string | null>(null)
 
   const lanes = useRestLanes({ muted, audioCtx, resolveAudioCtx: onAudioCtxInit })
 
@@ -71,8 +75,13 @@ export default function FocusModeV2(props: FocusModeV2Props) {
 
   useEffect(() => {
     if (ex) sendPresence?.(ex.id)
+    setPartnerPending(null)
+    setPartnerError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId])
+
+  // The refetch has landed — the server copy is now the truth.
+  useEffect(() => { setPartnerPending(null) }, [partnerState])
 
   // Rest mode is remembered per exercise, so the choice is made once.
   const [restModes, setRestModes] = useState<Record<string, RestMode>>({})
@@ -90,7 +99,9 @@ export default function FocusModeV2(props: FocusModeV2Props) {
 
   const selfSets = state.sessions[dateStr]?.entries[ex.id]?.sets ?? []
   const selfFeltEasy = state.sessions[dateStr]?.entries[ex.id]?.feltEasy ?? false
-  const partnerSets = partnerState?.sessions[dateStr]?.entries[ex.id]?.sets ?? []
+  // The partner's blob lives on the server, so a proxy write is shown optimistically
+  // until the refetch lands — otherwise confirming a set for them looks dead.
+  const partnerSets = partnerPending ?? partnerState?.sessions[dateStr]?.entries[ex.id]?.sets ?? []
 
   const prev = lastSessionBefore(state, ex.id, dateStr)
   const lastWeight = prev?.sets.find(s => s.kg !== undefined)?.kg
@@ -110,11 +121,24 @@ export default function FocusModeV2(props: FocusModeV2Props) {
     dispatch({ type: 'LOG_EXERCISE', date: dateStr, exerciseId: ex.id, entry: { sets: selfSets, feltEasy: !selfFeltEasy } as ExerciseEntry })
   }
 
-  const savePartner = (sets: SetEntry[]) => {
-    if (testMode || !partnerName || sessionId == null || !workoutType) return
+  // A proxy write is a server round-trip, so it has to say what happened —
+  // silently dropping it is what made the partner card look broken.
+  function savePartner(sets: SetEntry[]) {
+    if (readOnly) return
+    if (testMode) { setPartnerError('Test mode — nothing is written for your partner.'); return }
+    if (!partnerName || sessionId == null || !workoutType) {
+      setPartnerError('No active shared session — start one with your partner to log for them.')
+      return
+    }
+    setPartnerPending(sets)
+    setPartnerError(null)
     const feltEasy = partnerState?.sessions[dateStr]?.entries[ex.id]?.feltEasy ?? false
     sendProxyLog({ sessionId, date: dateStr, exerciseId: ex.id, workout: workoutType, entry: { sets, feltEasy } })
-      .then(ok => { if (ok) refreshPartner?.() })
+      .then(ok => {
+        if (ok) { refreshPartner?.(); return }
+        setPartnerPending(null)
+        setPartnerError(`Could not save for ${partnerName} — not logged. Check the connection and try again.`)
+      })
   }
 
   // A completed set starts that person's rest. Together mode uses one merged
@@ -129,6 +153,27 @@ export default function FocusModeV2(props: FocusModeV2Props) {
       setTargetLane(who)
     }
   }
+
+  // The partner card was logging blind — no suggested weight, no "last" reference.
+  // Their history is already loaded, so derive both the same way as for yourself.
+  const partnerPrev = partnerState ? lastSessionBefore(partnerState, ex.id, dateStr) : null
+  const partnerLastWeight = partnerPrev?.sets.find(s => s.kg !== undefined)?.kg
+  const partnerDaysSince = partnerPrev
+    ? Math.round((keyToDate(dateStr).getTime() - keyToDate(partnerPrev.date).getTime()) / 86400000)
+    : undefined
+  const partnerSuggestion = suggestNextWeight(ex.progressionType, partnerLastWeight, partnerPrev?.feltEasy ?? false, partnerDaysSince)
+
+  // Rest gate: while your lane is counting down the card logs nothing. In together
+  // mode both of you sit behind the one merged lane.
+  // Dual entry: one card, both people's numbers, one confirm. Per-side included —
+  // you switch sides at the same time, so a side is confirmed once for both.
+  const dualEntry = mode === 'together' && shared
+
+  const selfLaneKey = mode === 'together' && shared ? TOGETHER_KEY : username
+  const partnerLaneKey = mode === 'together' && shared ? TOGETHER_KEY : partnerName ?? ''
+  const liveLane = (key: string) => lanes.lanes.find(l => l.key === key && !l.done) ?? null
+  const selfLane = liveLane(selfLaneKey)
+  const partnerLane = liveLane(partnerLaneKey)
 
   const selfDone = exerciseDoneInV2(state.sessions, dateStr, ex, programWeek)
   const partnerDone = shared ? exerciseDoneInV2(partnerState!.sessions, dateStr, ex, programWeek) : true
@@ -202,7 +247,6 @@ export default function FocusModeV2(props: FocusModeV2Props) {
                 Take turns
               </button>
             </div>
-            <div className="v2-mode-note">saved for<br />{ex.name}</div>
           </div>
         )}
 
@@ -218,6 +262,15 @@ export default function FocusModeV2(props: FocusModeV2Props) {
           shared={shared}
           lastSet={prev?.sets[0]}
           suggestion={suggestion}
+          restRemaining={selfLane?.remaining ?? null}
+          restPaused={selfLane?.paused ?? false}
+          together={dualEntry ? {
+            label: partnerName!,
+            sets: partnerSets,
+            suggestion: partnerSuggestion,
+            lastSet: partnerPrev?.sets[0],
+            onSave: savePartner,
+          } : undefined}
           onSave={saveSelf}
           onSetComplete={() => startRest(username)}
           audioCtx={audioCtx}
@@ -226,7 +279,29 @@ export default function FocusModeV2(props: FocusModeV2Props) {
           readOnly={readOnly}
         />
 
-        {shared && (
+        {shared && partnerError && (
+          <div className="v2-partner-error" role="alert">{partnerError}</div>
+        )}
+
+        {/* Together mode logs both people from the one card above, so the partner
+            gets a mirror of what was written, not a second set of inputs. */}
+        {dualEntry ? (
+          <div className="v2-partner-mirror">
+            <div className="v2-partner-head">
+              <span className="v2-partner-name">{partnerName}</span>
+              <span className="v2-partner-sub">
+                {partnerPending ? 'saving…' : `${partnerLoggedSets}/${target.sets}`}
+              </span>
+            </div>
+            {partnerSets.length > 0 && (
+              <div className="v2-chips" role="group" aria-label={`${partnerName}'s logged sets`}>
+                {partnerSets.map((s, i) => (
+                  setComplete(s, ex) ? <span key={i} className="v2-chip">{i + 1} ✓ {formatSide(s, ex)}</span> : null
+                ))}
+              </div>
+            )}
+          </div>
+        ) : shared && (
           partnerOpen ? (
             <div className="v2-partner-open">
               <div className="v2-partner-head">
@@ -243,8 +318,10 @@ export default function FocusModeV2(props: FocusModeV2Props) {
                 ownerLabel={partnerName!}
                 restMode={mode}
                 shared={shared}
-                lastSet={undefined}
-                suggestion={null}
+                lastSet={partnerPrev?.sets[0]}
+                suggestion={partnerSuggestion}
+                restRemaining={partnerLane?.remaining ?? null}
+                restPaused={partnerLane?.paused ?? false}
                 onSave={savePartner}
                 onSetComplete={() => startRest(partnerName!)}
                 audioCtx={audioCtx}
