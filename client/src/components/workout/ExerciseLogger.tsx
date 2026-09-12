@@ -6,11 +6,12 @@ import { useStore } from '../../store/store'
 import { sendProxyLog } from '../../store/persistence'
 import { useTestMode } from '../../store/testMode'
 import { playDoneSound } from '../../lib/sounds'
-import { suggestNextWeight, repTargetFor, keyToDate } from '@letsgetbuff/shared'
+import { suggestNextWeight, repTargetFor, keyToDate, loggedExerciseIds } from '@letsgetbuff/shared'
 import type { ExerciseDef, ExerciseEntry, SetEntry, Session } from '@letsgetbuff/shared'
 import { RestTimer, ExerciseTimer, VideoCarousel, VideoPanel } from './timers'
 import { parseYouTubeUrl } from '../../lib/youtube'
 import { lastSessionBefore, formatSet, deltaLabel, formatDuration } from './helpers'
+import ExplainWhy from './ExplainWhy'
 
 function DragHandle({ listeners, attributes }: {
   listeners?: Record<string, unknown>
@@ -103,6 +104,7 @@ export function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, a
     : undefined
   const suggestion = suggestNextWeight(exercise.progressionType, lastWeight, prev?.feltEasy ?? false, daysSinceLast)
   const target = repTargetFor(exercise, programWeek)
+  const loggedIds = loggedExerciseIds(read.sessions)
 
   const makePrefill = (i: number): SetEntry => {
     if (existing?.sets[i]) return existing.sets[i]
@@ -278,6 +280,19 @@ export function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, a
               {suggestion !== null && <span style={{ color: 'var(--accent)', marginLeft: 8 }}>{`→ ${suggestion}kg`}</span>}
             </>
           ) : 'No previous data - start light.'}
+        </div>
+      )}
+
+      {expanded && (
+        <div className="mb-8">
+          <ExplainWhy
+            exercise={exercise}
+            programWeek={programWeek}
+            loggedIds={loggedIds}
+            lastWeight={lastWeight}
+            feltEasy={prev?.feltEasy ?? false}
+            daysSinceLast={daysSinceLast}
+          />
         </div>
       )}
 

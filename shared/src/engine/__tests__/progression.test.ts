@@ -1,6 +1,68 @@
 import { describe, it, expect } from 'vitest'
-import { suggestNextWeight, repBandFor, repTargetFor } from '../progression'
-import { getExercise, WORKOUTS } from '../../catalog/exercises'
+import {
+  suggestNextWeight, repBandFor, repTargetFor,
+  explainNextWeight, explainRepTarget, describeWeight, describeRepTarget,
+} from '../progression'
+import { getExercise, WORKOUTS, describeExerciseChoice } from '../../catalog/exercises'
+
+describe('explainNextWeight', () => {
+  it('names the rule behind every branch', () => {
+    expect(explainNextWeight('timed', undefined, false).reason).toBe('unweighted')
+    expect(explainNextWeight('dumbbell', undefined, false).reason).toBe('no-history')
+    expect(explainNextWeight('dumbbell', 20, false).reason).toBe('hold')
+    expect(explainNextWeight('dumbbell', 20, true).reason).toBe('increment')
+    expect(explainNextWeight('dumbbell', 20, true, 21).reason).toBe('deload')
+  })
+
+  it('always agrees with suggestNextWeight', () => {
+    const cases: Array<[Parameters<typeof suggestNextWeight>[0], number | undefined, boolean, number | undefined]> = [
+      ['dumbbell', undefined, false, undefined],
+      ['dumbbell', 20, false, 3],
+      ['dumbbell', 20, true, 3],
+      ['legPress', 100, true, 30],
+      ['cable', 40, false, 14],
+      ['timed', 10, true, 1],
+    ]
+    for (const [type, last, easy, days] of cases) {
+      expect(explainNextWeight(type, last, easy, days).weight).toBe(suggestNextWeight(type, last, easy, days))
+    }
+  })
+
+  it('describeWeight produces a sentence for every branch', () => {
+    for (const e of [
+      explainNextWeight('timed', undefined, false),
+      explainNextWeight('dumbbell', undefined, false),
+      explainNextWeight('dumbbell', 20, false),
+      explainNextWeight('dumbbell', 20, true),
+      explainNextWeight('dumbbell', 20, true, 21),
+    ]) {
+      expect(describeWeight(e).length).toBeGreaterThan(20)
+    }
+  })
+})
+
+describe('explainRepTarget', () => {
+  const bench = getExercise('dumbbell-bench-press')!
+
+  it('reports the band and the band target', () => {
+    expect(explainRepTarget(bench, 9).band).toBe(2)
+    expect(explainRepTarget(bench, 9).target).toEqual(repTargetFor(bench, 9))
+    expect(explainRepTarget(bench, 9).banded).toBe(true)
+  })
+
+  it('describes the target in words', () => {
+    expect(describeRepTarget(explainRepTarget(bench, 9))).toContain('3 x 8 reps')
+  })
+})
+
+describe('describeExerciseChoice', () => {
+  it('names the workout and the minWeek ramp', () => {
+    expect(describeExerciseChoice(getExercise('leg-press')!, 9)).toContain('Workout B')
+    expect(describeExerciseChoice(getExercise('face-pull')!, 9)).toContain('week 9')
+    expect(describeExerciseChoice(getExercise('face-pull')!, 3, new Set(['face-pull'])))
+      .toContain('already trained it')
+  })
+})
 
 describe('suggestNextWeight', () => {
   it('returns null when no history', () => {
@@ -146,7 +208,8 @@ describe('Workout B catalog (v2-2)', () => {
 
   it('contains the expected exercise list in order', () => {
     const ids = workoutB.exercises.map(e => e.id)
-    expect(ids).toEqual(['leg-press', 'single-arm-row', 'lat-pulldown', 'dumbbell-curl', 'overhead-tricep-extension', 'pallof-press', 'face-pull', 'standing-calf-raise'])
+    // Standing calf raise moved to A to even out the two gym days (plan v4).
+    expect(ids).toEqual(['leg-press', 'single-arm-row', 'lat-pulldown', 'dumbbell-curl', 'overhead-tricep-extension', 'pallof-press', 'face-pull'])
   })
 
   it('getExercise returns undefined for retired ids', () => {

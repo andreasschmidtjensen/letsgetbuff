@@ -155,6 +155,23 @@ export const WORKOUTS: WorkoutDef[] = [
           band3: { sets: 2, seconds: 40 },
         },
       },
+      {
+        id: 'standing-calf-raise',
+        name: 'Standing Calf Raise',
+        sets: 3,
+        reps: 12,
+        progressionType: 'dumbbell',
+        requiresKg: true,
+        videoUrls: ['https://www.youtube.com/shorts/8sT7Ne3Kzwc'],
+        alternatives: ['Seated calf raise', 'Single-leg calf raise'],
+        notes: 'Full range: deep heel stretch at the bottom, pause tall on the toes. Hold a dumbbell for load.',
+        safetyCues: [],
+        repProgression: {
+          band1: { sets: 3, reps: 12 },
+          band2: { sets: 3, reps: 12 },
+          band3: { sets: 3, reps: 12, addLoad: true },
+        },
+      },
     ],
   },
   {
@@ -301,23 +318,6 @@ export const WORKOUTS: WorkoutDef[] = [
           band3: { sets: 3, reps: 12 },
         },
       },
-      {
-        id: 'standing-calf-raise',
-        name: 'Standing Calf Raise',
-        sets: 3,
-        reps: 12,
-        progressionType: 'dumbbell',
-        requiresKg: true,
-        videoUrls: ['https://www.youtube.com/shorts/8sT7Ne3Kzwc'],
-        alternatives: ['Seated calf raise', 'Single-leg calf raise'],
-        notes: 'Full range: deep heel stretch at the bottom, pause tall on the toes. Hold a dumbbell for load.',
-        safetyCues: [],
-        repProgression: {
-          band1: { sets: 3, reps: 12 },
-          band2: { sets: 3, reps: 12 },
-          band3: { sets: 3, reps: 12, addLoad: true },
-        },
-      },
     ],
   },
 ]
@@ -337,7 +337,7 @@ export interface Plan {
 }
 
 export const DEFAULT_PLAN: Plan = {
-  version: 3, // v2: reverse plank in warmups (DB migration 6); v3: side plank + calf raise (migration 7)
+  version: 4, // v2: reverse plank in warmups (migration 6); v3: side plank + calf raise (7); v4: calf raise moved B -> A (9)
   workouts: WORKOUTS,
 }
 
@@ -393,6 +393,33 @@ export function getWorkoutExercises(
   const w = getWorkout(workout)
   if (!w) return []
   return w.exercises.filter(e => !e.minWeek || programWeek >= e.minWeek || loggedIds.has(e.id))
+}
+
+/**
+ * Why this exercise is in today's workout — the plan-side half of "Explain why".
+ * Mirrors the filter in `getWorkoutExercises`, so the copy cannot claim a reason
+ * the selection logic does not actually use.
+ */
+export function describeExerciseChoice(
+  exercise: ExerciseDef,
+  programWeek: number,
+  loggedIds: ReadonlySet<string> = NO_LOGGED_IDS,
+): string {
+  const workout = getPlan().workouts.find(w => w.exercises.some(e => e.id === exercise.id))
+  const where = workout ? `Workout ${workout.id} (${workout.name})` : 'this workout'
+  const base = `${exercise.name} is part of ${where}, which the calendar prescribes for today.`
+  const alts = exercise.alternatives.length
+    ? ` If the equipment is taken or it does not feel right, ${exercise.alternatives.join(' or ')} covers the same job.`
+    : ''
+  if (exercise.minWeek) {
+    const ramped = programWeek >= exercise.minWeek
+      ? `It joins the plan from program week ${exercise.minWeek}; you are at week ${programWeek}.`
+      : loggedIds.has(exercise.id)
+        ? `It normally starts at program week ${exercise.minWeek} and you are at week ${programWeek}, but you have already trained it - once trained it stays in the plan.`
+        : `It starts at program week ${exercise.minWeek}.`
+    return `${base} ${ramped}${alts}`
+  }
+  return `${base}${alts}`
 }
 
 export function getExercise(id: string): ExerciseDef | undefined {

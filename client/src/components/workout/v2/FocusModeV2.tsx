@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../../../store/store'
 import { sendProxyLog } from '../../../store/persistence'
 import { useTestMode } from '../../../store/testMode'
-import { repTargetFor, suggestNextWeight, keyToDate } from '@letsgetbuff/shared'
+import { repTargetFor, suggestNextWeight, keyToDate, loggedExerciseIds } from '@letsgetbuff/shared'
 import type { ExerciseDef, ExerciseEntry, SetEntry, Session } from '@letsgetbuff/shared'
 import TestModeBanner from '../../TestModeBanner'
 import { SessionTimer, VideoPanel } from '../timers'
 import { lastSessionBefore } from '../helpers'
+import ExplainWhy from '../ExplainWhy'
 import ExerciseCardV2 from './ExerciseCardV2'
 import RestDock from './RestDock'
 import UiVersionChip from './UiVersionChip'
@@ -97,6 +98,7 @@ export default function FocusModeV2(props: FocusModeV2Props) {
     ? Math.round((keyToDate(dateStr).getTime() - keyToDate(prev.date).getTime()) / 86400000)
     : undefined
   const suggestion = suggestNextWeight(ex.progressionType, lastWeight, prev?.feltEasy ?? false, daysSinceLast)
+  const loggedIds = loggedExerciseIds(state.sessions)
 
   const saveSelf = (sets: SetEntry[]) => {
     dispatch({ type: 'LOG_EXERCISE', date: dateStr, exerciseId: ex.id, entry: { sets, feltEasy: selfFeltEasy } as ExerciseEntry })
@@ -160,11 +162,22 @@ export default function FocusModeV2(props: FocusModeV2Props) {
               {target.sets}×{target.seconds ?? target.reps}{ex.perSide ? '/side' : ''}{target.addLoad ? ' +load' : ''}
             </div>
           </div>
-          {ex.videoUrls.length > 0 && (
-            <button className="v2-form-btn" onClick={() => setShowVideo(v => !v)} aria-expanded={showVideo}>
-              ▶ Form
-            </button>
-          )}
+          <div className="v2-title-actions">
+            <ExplainWhy
+              exercise={ex}
+              programWeek={programWeek}
+              loggedIds={loggedIds}
+              lastWeight={lastWeight}
+              feltEasy={prev?.feltEasy ?? false}
+              daysSinceLast={daysSinceLast}
+              compact
+            />
+            {ex.videoUrls.length > 0 && (
+              <button className="v2-form-btn" onClick={() => setShowVideo(v => !v)} aria-expanded={showVideo}>
+                ▶ Form
+              </button>
+            )}
+          </div>
         </div>
 
         {showVideo && ex.videoUrls.length > 0 && (

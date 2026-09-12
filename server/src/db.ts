@@ -21,7 +21,7 @@ export type Db = DatabaseSync
 
 // ---- Migration ladder -------------------------------------------------------
 
-const CURRENT_DB_VERSION = 8
+const CURRENT_DB_VERSION = 9
 
 type Migration = (db: DatabaseSync) => void
 
@@ -194,6 +194,34 @@ const MIGRATIONS: Record<number, Migration> = {
         created_at   TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `)
+  },
+  9: (db) => {
+    // Balance the two gym days: workout B ran 8 exercises to A's 6, so the
+    // standing calf raise moves B -> A. Logged sets are keyed by exercise id, so
+    // history follows the exercise; same in-place plan edit as migrations 6/7.
+    const row = db.prepare('SELECT json, version FROM plan WHERE id = 1').get() as
+      | { json: string; version: number }
+      | undefined
+    if (!row) return // fresh DB: seedPlan() inserts the current catalog
+    try {
+      const plan = JSON.parse(row.json) as {
+        version: number
+        workouts: { id: string; exercises: { id: string }[] }[]
+      }
+      const from = plan.workouts.find(w => w.id === 'B')
+      const to = plan.workouts.find(w => w.id === 'A')
+      const i = from?.exercises.findIndex(e => e.id === 'standing-calf-raise') ?? -1
+      if (from && to && i >= 0 && !to.exercises.some(e => e.id === 'standing-calf-raise')) {
+        const [def] = from.exercises.splice(i, 1)
+        to.exercises.push(def)
+      }
+      plan.version = row.version + 1
+      db.prepare('UPDATE plan SET json = ?, version = ? WHERE id = 1').run(
+        JSON.stringify(plan), plan.version,
+      )
+    } catch (err) {
+      console.error('[db] Migration 9: could not move standing calf raise', err)
+    }
   },
 }
 

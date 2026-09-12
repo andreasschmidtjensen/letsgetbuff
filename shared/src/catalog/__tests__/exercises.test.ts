@@ -15,8 +15,17 @@ describe('exercise catalog integrity', () => {
     for (const w of WORKOUTS) expect(w.warmup).toMatch(/plank/i)
   })
 
-  it('plan version is 3 (reverse-plank warmups + side plank + calf raise)', () => {
-    expect(DEFAULT_PLAN.version).toBe(3)
+  it('plan version is 4 (calf raise moved B -> A)', () => {
+    expect(DEFAULT_PLAN.version).toBe(4)
+  })
+
+  it('A and B carry the same number of exercises at week 9+', () => {
+    expect(getWorkoutExercises('A', 9).length).toBe(getWorkoutExercises('B', 9).length)
+  })
+
+  it('standing calf raise lives in workout A', () => {
+    expect(getWorkoutExercises('A', 1).map(e => e.id)).toContain('standing-calf-raise')
+    expect(getWorkoutExercises('B', 1).map(e => e.id)).not.toContain('standing-calf-raise')
   })
 })
 
