@@ -33,7 +33,9 @@ interface SideSetStepperProps {
 export default function SideSetStepper(props: SideSetStepperProps) {
   const { exercise, setIndex, totalSets, value, targetSeconds, targetReps, onLogSide, audioCtx, onAudioCtxInit, muted, readOnly } = props
   const [timingSide, setTimingSide] = useState<Side | null>(null)
-  const [reps, setReps] = useState<Record<Side, string>>({ left: '', right: '' })
+  // Undefined = untouched, so the field falls back to the logged / target reps
+  // the same way the non-per-side card does.
+  const [reps, setReps] = useState<Partial<Record<Side, string>>>({})
   // Set while re-timing one already-logged half, so it stays the active side
   // until its new value lands.
   const [redo, setRedo] = useState<Side | null>(null)
@@ -52,13 +54,16 @@ export default function SideSetStepper(props: SideSetStepperProps) {
     onLogSide(side, { ...half(side), seconds: achieved })
   }
 
+  const repsValue = (side: Side): string =>
+    reps[side] ?? (half(side)?.reps !== undefined ? String(half(side)!.reps) : targetReps !== undefined ? String(targetReps) : '')
+
   const logReps = (side: Side) => {
     if (readOnly) return
-    const n = Number(reps[side])
+    const n = Number(repsValue(side))
     if (!Number.isFinite(n) || n <= 0) return
     setRedo(null)
     onLogSide(side, { ...half(side), reps: n })
-    setReps(r => ({ ...r, [side]: '' }))
+    setReps(r => ({ ...r, [side]: undefined }))
   }
 
   // Which side is being worked now: the first not yet logged, or the one being redone.
@@ -140,7 +145,7 @@ export default function SideSetStepper(props: SideSetStepperProps) {
             inputMode="numeric"
             min={0}
             placeholder={String(targetReps ?? '')}
-            value={reps[active]}
+            value={repsValue(active)}
             onChange={e => setReps(r => ({ ...r, [active]: e.target.value }))}
             aria-label={`Reps for the ${active} side`}
           />
