@@ -6,7 +6,7 @@ import { useStore } from '../../store/store'
 import { sendProxyLog } from '../../store/persistence'
 import { useTestMode } from '../../store/testMode'
 import { playDoneSound } from '../../lib/sounds'
-import { suggestNextWeight, repTargetFor, keyToDate, loggedExerciseIds } from '@letsgetbuff/shared'
+import { suggestNextWeight, repTargetFor, exerciseRepBand, keyToDate, loggedExerciseIds, loadSuffix } from '@letsgetbuff/shared'
 import type { ExerciseDef, ExerciseEntry, SetEntry, Session } from '@letsgetbuff/shared'
 import { RestTimer, ExerciseTimer, VideoCarousel, VideoPanel } from './timers'
 import { parseYouTubeUrl } from '../../lib/youtube'
@@ -103,7 +103,9 @@ export function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, a
     ? Math.round((keyToDate(dateStr).getTime() - keyToDate(prev.date).getTime()) / 86400000)
     : undefined
   const suggestion = suggestNextWeight(exercise.progressionType, lastWeight, prev?.feltEasy ?? false, daysSinceLast)
-  const target = repTargetFor(exercise, programWeek)
+  // Rep band from this exercise's own history (sessions before today).
+  const bandInfo = exerciseRepBand(read.sessions, exercise.id, dateStr)
+  const target = repTargetFor(exercise, bandInfo.band)
   const loggedIds = loggedExerciseIds(read.sessions)
 
   const makePrefill = (i: number): SetEntry => {
@@ -277,7 +279,7 @@ export function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, a
           {prev ? (
             <>
               Last: {prev.sets.map(s => formatSet(s, exercise)).join(', ')}
-              {suggestion !== null && <span style={{ color: 'var(--accent)', marginLeft: 8 }}>{`→ ${suggestion}kg`}</span>}
+              {suggestion !== null && <span style={{ color: 'var(--accent)', marginLeft: 8 }}>{`→ ${suggestion}kg${loadSuffix(exercise)}`}</span>}
             </>
           ) : 'No previous data - start light.'}
         </div>
@@ -288,6 +290,7 @@ export function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, a
           <ExplainWhy
             exercise={exercise}
             programWeek={programWeek}
+            bandInfo={bandInfo}
             loggedIds={loggedIds}
             lastWeight={lastWeight}
             feltEasy={prev?.feltEasy ?? false}
@@ -323,9 +326,9 @@ export function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, a
               ) : isEditing ? (
                 <div className="set-inputs" role="group" aria-label={`Edit set ${i + 1}`}>
                   {exercise.requiresKg ? (
-                    <input id={`${exercise.id}-${i}-kg`} type="number" className="input-sm" placeholder="kg"
+                    <input id={`${exercise.id}-${i}-kg`} type="number" className="input-sm" placeholder={`kg${loadSuffix(exercise)}`}
                       value={s.kg ?? ''} onChange={e => updateSet(i, 'kg', e.target.value)}
-                      min={0} step={0.5} aria-label="Weight in kg" autoFocus />
+                      min={0} step={0.5} aria-label={`Weight in kg${loadSuffix(exercise)}`} autoFocus />
                   ) : <span />}
                   {target.seconds ? (
                     <input type="number" className="input-sm" placeholder="sec"
@@ -355,8 +358,8 @@ export function ExerciseLogger({ exercise, dateStr, programWeek, onStartFocus, a
               ) : (
                 <div className="set-inputs" role="group" aria-label={`Set ${i + 1} inputs`}>
                   {exercise.requiresKg ? (
-                    <input type="number" className="input-sm" placeholder="kg"
-                      value={s.kg ?? ''} onChange={e => updateSet(i, 'kg', e.target.value)} min={0} step={0.5} aria-label="Weight in kg" />
+                    <input type="number" className="input-sm" placeholder={`kg${loadSuffix(exercise)}`}
+                      value={s.kg ?? ''} onChange={e => updateSet(i, 'kg', e.target.value)} min={0} step={0.5} aria-label={`Weight in kg${loadSuffix(exercise)}`} />
                   ) : <span />}
                   <input type="number" className="input-sm" placeholder="reps"
                     value={s.reps ?? ''} onChange={e => updateSet(i, 'reps', e.target.value)} min={0} aria-label="Reps" />

@@ -42,14 +42,14 @@ test('exerciseDoneInV2 needs both sides of every set; v1 only needs one entry ea
 
   const halfLogged = Array.from({ length: target.sets }, () => ({ ...value }))
   const sessions = { '2026-08-29': { workout: 'A' as const, done: false, entries: { [ex.id]: { sets: halfLogged, feltEasy: false } } } }
-  expect(exerciseDoneInV2(sessions, '2026-08-29', ex, 1)).toBe(false)
+  expect(exerciseDoneInV2(sessions, '2026-08-29', ex)).toBe(false)
   // v1 counts one entry per set, so it reads the same number of SETS — the
   // point of the nested shape: v2 never inflates v1's counter.
-  expect(exerciseDoneIn(sessions, '2026-08-29', ex, 1)).toBe(true)
+  expect(exerciseDoneIn(sessions, '2026-08-29', ex)).toBe(true)
 
   const full = halfLogged.map(s => ({ ...s, right: { ...value } }))
   const done = { '2026-08-29': { workout: 'A' as const, done: false, entries: { [ex.id]: { sets: full, feltEasy: false } } } }
-  expect(exerciseDoneInV2(done, '2026-08-29', ex, 1)).toBe(true)
+  expect(exerciseDoneInV2(done, '2026-08-29', ex)).toBe(true)
 })
 
 test('a v2 export round-trips into v1 byte-identically, per-side halves included', () => {

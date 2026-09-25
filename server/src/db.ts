@@ -13,6 +13,8 @@
  *   plan_proposals  -- Claude-generated exercise candidates awaiting approval (Phase 8)
  */
 
+import fs from 'fs'
+import path from 'path'
 import { DatabaseSync } from 'node:sqlite'
 import { getPlan, getExercise } from '@letsgetbuff/shared'
 import { config } from './config.js'
@@ -21,7 +23,7 @@ export type Db = DatabaseSync
 
 // ---- Migration ladder -------------------------------------------------------
 
-const CURRENT_DB_VERSION = 9
+const CURRENT_DB_VERSION = 11
 
 type Migration = (db: DatabaseSync) => void
 
@@ -223,6 +225,61 @@ const MIGRATIONS: Record<number, Migration> = {
       console.error('[db] Migration 9: could not move standing calf raise', err)
     }
   },
+  10: (db) => {
+    // Plan v5: load modes (perHand/single/total) + authored rationale join every
+    // catalog exercise. Same in-place patch as migrations 6/7/9 — copy the new
+    // fields per exercise from the catalog so Claude-approved additions and any
+    // reordering survive; exercises unknown to the catalog are left untouched.
+    const row = db.prepare('SELECT json, version FROM plan WHERE id = 1').get() as
+      | { json: string; version: number }
+      | undefined
+    if (!row) return // fresh DB: seedPlan() inserts the current catalog (v5)
+    try {
+      const plan = JSON.parse(row.json) as {
+        version: number
+        workouts: { id: string; exercises: Array<{ id: string; load?: unknown; rationale?: unknown }> }[]
+      }
+      for (const w of plan.workouts) {
+        for (const e of w.exercises) {
+          const def = getExercise(e.id)
+          if (!def) continue // AI-added exercise: nothing authored to copy
+          if (def.load && e.load == null) e.load = def.load
+          if (def.rationale && e.rationale == null) e.rationale = def.rationale
+        }
+      }
+      plan.version = row.version + 1
+      db.prepare('UPDATE plan SET json = ?, version = ? WHERE id = 1').run(
+        JSON.stringify(plan), plan.version,
+      )
+    } catch (err) {
+      console.error('[db] Migration 10: could not add load modes and rationale', err)
+    }
+  },
+  11: (db) => {
+    // Weighted back extension joins Workout B (plan v6): the direct lower-back
+    // hinge B lacked, balancing A's RDL across the week. Same in-place append
+    // pattern as migration 7, inserted after the lat pulldown when it is still
+    // where the catalog put it, otherwise appended.
+    const row = db.prepare('SELECT json, version FROM plan WHERE id = 1').get() as
+      | { json: string; version: number }
+      | undefined
+    if (!row) return // fresh DB: seedPlan() inserts the current catalog (v6)
+    try {
+      const plan = JSON.parse(row.json) as { version: number; workouts: { id: string; exercises: { id: string }[] }[] }
+      const w = plan.workouts.find(x => x.id === 'B')
+      const def = getExercise('back-extension')
+      if (w && def && !w.exercises.some(e => e.id === 'back-extension')) {
+        const after = w.exercises.findIndex(e => e.id === 'lat-pulldown')
+        w.exercises.splice(after >= 0 ? after + 1 : w.exercises.length, 0, def as unknown as { id: string })
+      }
+      plan.version = row.version + 1
+      db.prepare('UPDATE plan SET json = ?, version = ? WHERE id = 1').run(
+        JSON.stringify(plan), plan.version,
+      )
+    } catch (err) {
+      console.error('[db] Migration 11: could not append back extension', err)
+    }
+  },
 }
 
 function getDbVersion(db: DatabaseSync): number {
@@ -242,9 +299,30 @@ function setDbVersion(db: DatabaseSync, version: number): void {
   ).run(1, version)
 }
 
+/**
+ * Snapshot the database before any migration touches it, so a bad migration is
+ * always recoverable (`backups/buff-pre-migration-vN.db`, N = the version being
+ * left). Uses `VACUUM INTO` like backup.ts — a raw file copy of a WAL database
+ * can miss transactions in the -wal sidecar. The daily backup scheduler only
+ * starts AFTER openDb() has migrated, so it cannot provide this snapshot.
+ * A failed snapshot aborts startup: migrating without a safety net is worse
+ * than not starting.
+ */
+function snapshotBeforeMigration(db: DatabaseSync, fromVersion: number): void {
+  const dir = path.join(path.dirname(config.buffDbPath), 'backups')
+  fs.mkdirSync(dir, { recursive: true })
+  const dest = path.join(dir, `buff-pre-migration-v${fromVersion}.db`)
+  // VACUUM INTO refuses to overwrite; a leftover from a previous run of the
+  // same migration (e.g. a crash before setDbVersion) should be replaced.
+  if (fs.existsSync(dest)) fs.unlinkSync(dest)
+  db.prepare('VACUUM INTO ?').run(dest)
+  console.log('[db] Pre-migration snapshot:', dest)
+}
+
 function runMigrations(db: DatabaseSync): void {
   const current = getDbVersion(db)
   if (current >= CURRENT_DB_VERSION) return
+  if (current > 0) snapshotBeforeMigration(db, current) // fresh DB: nothing to save
   for (let v = current + 1; v <= CURRENT_DB_VERSION; v++) {
     const migration = MIGRATIONS[v]
     if (!migration) throw new Error(`Missing DB migration for version ${v}`)

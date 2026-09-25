@@ -73,6 +73,19 @@ function validateExerciseDef(raw) {
     safetyCues: raw.safetyCues,
     ...(raw.minWeek != null ? { minWeek: raw.minWeek } : {}),
     repProgression: raw.repProgression,
+    // Optional since plan v5 — accept valid, drop invalid, never throw
+    // (old stored proposals lack them and must still approve).
+    ...(raw.load === 'perHand' || raw.load === 'single' || raw.load === 'total'
+      ? { load: raw.load }
+      : {}),
+    ...(typeof raw.rationale === 'object' && raw.rationale !== null && typeof raw.rationale.purpose === 'string'
+      ? {
+          rationale: {
+            purpose: raw.rationale.purpose,
+            ...(typeof raw.rationale.repScheme === 'string' ? { repScheme: raw.rationale.repScheme } : {}),
+          },
+        }
+      : {}),
   }
 }
 
@@ -328,6 +341,35 @@ test('validateExerciseDef rejects non-kebab-case id', () => {
     () => validateExerciseDef({ ...MOCK_EXERCISE, id: 'Cable Lateral Raise' }),
     /kebab-case/,
   )
+})
+
+test('validateExerciseDef passes through valid load and rationale (plan v5)', () => {
+  const result = validateExerciseDef({
+    ...MOCK_EXERCISE,
+    load: 'total',
+    rationale: { purpose: 'Rear delts and rotator cuff.', repScheme: 'High reps: light load needs 15 reps.' },
+  })
+  assert.equal(result.load, 'total')
+  assert.deepEqual(result.rationale, {
+    purpose: 'Rear delts and rotator cuff.',
+    repScheme: 'High reps: light load needs 15 reps.',
+  })
+})
+
+test('validateExerciseDef drops invalid load/rationale without throwing', () => {
+  const result = validateExerciseDef({
+    ...MOCK_EXERCISE,
+    load: 'perFoot',
+    rationale: { repScheme: 'no purpose given' },
+  })
+  assert.equal('load' in result, false)
+  assert.equal('rationale' in result, false)
+})
+
+test('validateExerciseDef still accepts proposals without load/rationale (pre-v5 back-compat)', () => {
+  const result = validateExerciseDef({ ...MOCK_EXERCISE })
+  assert.equal('load' in result, false)
+  assert.equal('rationale' in result, false)
 })
 
 test('approve re-validates candidate — rejects invalid stored data', () => {

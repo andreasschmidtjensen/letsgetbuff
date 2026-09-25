@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import {
   describeExerciseChoice,
+  describeLoadMode,
   describeRepTarget,
   describeWeight,
   explainNextWeight,
   explainRepTarget,
 } from '@letsgetbuff/shared'
-import type { ExerciseDef } from '@letsgetbuff/shared'
+import type { ExerciseDef, ExerciseBandInfo } from '@letsgetbuff/shared'
 
 /**
  * "Explain why" — the reasoning behind today's exercise, its rep target and its
@@ -18,7 +19,10 @@ import type { ExerciseDef } from '@letsgetbuff/shared'
 
 interface ExplainWhyProps {
   exercise: ExerciseDef
+  /** Still drives the minWeek text in "why this exercise". */
   programWeek: number
+  /** This exercise's session-count band (from `exerciseRepBand`). */
+  bandInfo: ExerciseBandInfo
   loggedIds?: ReadonlySet<string>
   lastWeight?: number
   feltEasy: boolean
@@ -28,12 +32,13 @@ interface ExplainWhyProps {
 }
 
 export default function ExplainWhy(props: ExplainWhyProps) {
-  const { exercise, programWeek, loggedIds, lastWeight, feltEasy, daysSinceLast, compact } = props
+  const { exercise, programWeek, bandInfo, loggedIds, lastWeight, feltEasy, daysSinceLast, compact } = props
   const [open, setOpen] = useState(false)
   const panelId = `explain-${exercise.id}`
 
   const weight = explainNextWeight(exercise.progressionType, lastWeight, feltEasy, daysSinceLast)
-  const reps = explainRepTarget(exercise, programWeek)
+  const reps = explainRepTarget(exercise, bandInfo)
+  const loadNote = describeLoadMode(exercise)
 
   return (
     <>
@@ -52,6 +57,7 @@ export default function ExplainWhy(props: ExplainWhyProps) {
           <p><strong>Why this exercise</strong><br />{describeExerciseChoice(exercise, programWeek, loggedIds)}</p>
           <p><strong>Why these sets and reps</strong><br />{describeRepTarget(reps)}</p>
           <p><strong>Why this weight</strong><br />{describeWeight(weight)}</p>
+          {loadNote && <p><strong>How to read the weight</strong><br />{loadNote}</p>}
           {exercise.notes && <p><strong>Form</strong><br />{exercise.notes}</p>}
         </div>
       )}

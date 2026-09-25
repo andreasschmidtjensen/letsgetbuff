@@ -1,4 +1,4 @@
-import { ExerciseDef, SetEntry, Session, repTargetFor } from '@letsgetbuff/shared'
+import { ExerciseDef, SetEntry, Session, repTargetFor, exerciseRepBand, loadSuffix } from '@letsgetbuff/shared'
 
 // Pure helpers for the v2 workout screens. v1's `./helpers` stays untouched —
 // these differ only where per-side sets change the arithmetic.
@@ -26,9 +26,8 @@ export function exerciseDoneInV2(
   sessions: Record<string, Session>,
   dateStr: string,
   ex: ExerciseDef,
-  programWeek: number,
 ): boolean {
-  const target = repTargetFor(ex, programWeek)
+  const target = repTargetFor(ex, exerciseRepBand(sessions, ex.id, dateStr).band)
   const logged = sessions[dateStr]?.entries[ex.id]?.sets ?? []
   return logged.filter(s => setComplete(s, ex)).length >= target.sets
 }
@@ -43,7 +42,7 @@ export function sidesLogged(s: SetEntry | undefined, ex: ExerciseDef): number {
 export function formatSide(s: SetEntry | undefined, ex: ExerciseDef): string {
   if (!s) return '-'
   const parts: string[] = []
-  if (ex.requiresKg && s.kg !== undefined) parts.push(`${s.kg}kg`)
+  if (ex.requiresKg && s.kg !== undefined) parts.push(`${s.kg}kg${loadSuffix(ex)}`)
   if (s.reps !== undefined) parts.push(`×${s.reps}`)
   else if (s.seconds !== undefined) parts.push(`${s.seconds}s`)
   return parts.join(' ') || '-'

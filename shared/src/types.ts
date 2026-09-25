@@ -97,7 +97,7 @@ export const EMPTY_STATE: AppState = {
   milestones: {},
 }
 
-export type Tab = 'home' | 'workout' | 'stretch' | 'hometraining' | 'metrics' | 'milestones' | 'history' | 'settings'
+export type Tab = 'home' | 'workout' | 'stretch' | 'hometraining' | 'metrics' | 'milestones' | 'history' | 'guide' | 'settings'
 
 // Per-account privilege level (Phase 11). Lives in buff.db, never in CWA.
 export type Privilege = 'none' | 'viewer' | 'user' | 'admin'

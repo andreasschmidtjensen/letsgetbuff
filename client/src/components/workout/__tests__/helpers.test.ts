@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { parseWarmup } from '../helpers'
+import type { ExerciseDef } from '@letsgetbuff/shared'
+import { parseWarmup, formatSet } from '../helpers'
+import { formatSide } from '../v2/helpers'
 
 describe('parseWarmup', () => {
   it('returns null for empty input', () => {
@@ -34,5 +36,28 @@ describe('parseWarmup', () => {
     expect(parseWarmup('light cycling')).toEqual([
       { label: 'light cycling', seconds: 300 },
     ])
+  })
+})
+
+describe('formatSet / formatSide — load-mode suffix', () => {
+  const base: ExerciseDef = {
+    id: 'x', name: 'X', sets: 3, reps: 10, progressionType: 'dumbbell',
+    requiresKg: true, videoUrls: [], alternatives: [], notes: '', safetyCues: [],
+  }
+
+  it('appends the per-hand / single-dumbbell suffix', () => {
+    expect(formatSet({ kg: 12, reps: 10 }, { ...base, load: 'perHand' })).toBe('12kg/hand x10')
+    expect(formatSet({ kg: 14, reps: 12 }, { ...base, load: 'single' })).toBe('14kg (1 DB) x12')
+    expect(formatSide({ kg: 12, reps: 10 }, { ...base, load: 'perHand' })).toBe('12kg/hand ×10')
+  })
+
+  it('total and unlabeled (pre-v5 plan rows) render exactly as before', () => {
+    expect(formatSet({ kg: 60, reps: 10 }, { ...base, load: 'total' })).toBe('60kg x10')
+    expect(formatSet({ kg: 60, reps: 10 }, base)).toBe('60kg x10')
+    expect(formatSide({ kg: 60, reps: 10 }, base)).toBe('60kg ×10')
+  })
+
+  it('unweighted sets are unaffected', () => {
+    expect(formatSet({ seconds: 30 }, { ...base, requiresKg: false, reps: null })).toBe('30s')
   })
 })

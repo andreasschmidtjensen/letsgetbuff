@@ -20,13 +20,13 @@ import UiVersionChip from './UiVersionChip'
 interface OrderRowProps {
   exercise: ExerciseDef
   index: number
-  programWeek: number
+  band: 1 | 2 | 3
   belowFold: boolean
 }
 
-function OrderRow({ exercise, index, programWeek, belowFold }: OrderRowProps) {
+function OrderRow({ exercise, index, band, belowFold }: OrderRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: exercise.id })
-  const target = repTargetFor(exercise, programWeek)
+  const target = repTargetFor(exercise, band)
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -52,6 +52,8 @@ interface WorkoutOverviewV2Props {
   onDateChange: (date: string) => void
   onWorkoutTypeChange: (t: 'A' | 'B') => void
   programWeek: number
+  /** Session-count rep band per exercise (see `exerciseRepBand`). */
+  bandFor: (exerciseId: string) => 1 | 2 | 3
   exercises: ExerciseDef[]
   liveOrder: string[]
   sensors: SensorDescriptor<SensorOptions>[]
@@ -76,7 +78,7 @@ interface WorkoutOverviewV2Props {
 
 export default function WorkoutOverviewV2(props: WorkoutOverviewV2Props) {
   const {
-    workoutType, workoutName, dateStr, todayStr, onDateChange, onWorkoutTypeChange, programWeek,
+    workoutType, workoutName, dateStr, todayStr, onDateChange, onWorkoutTypeChange, programWeek, bandFor,
     exercises, liveOrder, sensors, onDragEnd, warmup, warmupText, onStart, username, partnerName,
     onChangeParticipants, audioCtx, onAudioCtxInit, muted, liveHint, readOnly, done, onUndoDone,
     durationSec,
@@ -189,7 +191,7 @@ export default function WorkoutOverviewV2(props: WorkoutOverviewV2Props) {
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={liveOrder} strategy={verticalListSortingStrategy}>
           {exercises.map((ex, i) => (
-            <OrderRow key={ex.id} exercise={ex} index={i} programWeek={programWeek} belowFold={i >= 5} />
+            <OrderRow key={ex.id} exercise={ex} index={i} band={bandFor(ex.id)} belowFold={i >= 5} />
           ))}
         </SortableContext>
       </DndContext>

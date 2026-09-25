@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
-  suggestNextWeight, repBandFor, repTargetFor,
+  suggestNextWeight, repTargetFor, exerciseRepBand,
   explainNextWeight, explainRepTarget, describeWeight, describeRepTarget,
+  INCREMENTS, BAND_REGRESS_GAP_DAYS, BAND_REBUILD_SESSIONS,
 } from '../progression'
+import type { Session } from '../../types'
 import { getExercise, WORKOUTS, describeExerciseChoice } from '../../catalog/exercises'
 
 describe('explainNextWeight', () => {
@@ -41,17 +43,127 @@ describe('explainNextWeight', () => {
   })
 })
 
-describe('explainRepTarget', () => {
-  const bench = getExercise('dumbbell-bench-press')!
+// Build a sessions blob with one real set of `exId` on each given date.
+function sessionsOn(exId: string, dates: string[]): Record<string, Session> {
+  const sessions: Record<string, Session> = {}
+  for (const date of dates) {
+    sessions[date] = {
+      workout: 'A', done: true,
+      entries: { [exId]: { feltEasy: false, sets: [{ kg: 10, reps: 10 }] } },
+    } as unknown as Session
+  }
+  return sessions
+}
 
-  it('reports the band and the band target', () => {
-    expect(explainRepTarget(bench, 9).band).toBe(2)
-    expect(explainRepTarget(bench, 9).target).toEqual(repTargetFor(bench, 9))
-    expect(explainRepTarget(bench, 9).banded).toBe(true)
+// N sessions on consecutive days ending the day before `asOf`.
+function nSessionsBefore(exId: string, n: number, asOf = '2026-09-25'): Record<string, Session> {
+  const end = new Date(`${asOf}T00:00:00Z`)
+  const dates = Array.from({ length: n }, (_, i) => {
+    const d = new Date(end); d.setUTCDate(d.getUTCDate() - (n - i)); return d.toISOString().slice(0, 10)
+  })
+  return sessionsOn(exId, dates)
+}
+
+describe('exerciseRepBand — session-count bands', () => {
+  const id = 'dumbbell-bench-press'
+  const asOf = '2026-09-25'
+
+  it('band 1 for the first 8 sessions, 2 from the 9th, 3 from the 17th', () => {
+    expect(exerciseRepBand({}, id, asOf)).toEqual({ band: 1, count: 0, countBand: 1 })
+    expect(exerciseRepBand(nSessionsBefore(id, 7, asOf), id, asOf).band).toBe(1)
+    expect(exerciseRepBand(nSessionsBefore(id, 8, asOf), id, asOf).band).toBe(2)
+    expect(exerciseRepBand(nSessionsBefore(id, 16, asOf), id, asOf).band).toBe(3)
   })
 
-  it('describes the target in words', () => {
-    expect(describeRepTarget(explainRepTarget(bench, 9))).toContain('3 x 8 reps')
+  it('only sessions strictly before asOf count, and only with real sets', () => {
+    const sessions = sessionsOn(id, ['2026-09-20', asOf])
+    expect(exerciseRepBand(sessions, id, asOf).count).toBe(1)
+    // A kg-only prefill is not training.
+    const prefillOnly = { '2026-09-20': { workout: 'A', done: false, entries: { [id]: { feltEasy: false, sets: [{ kg: 10 }] } } } } as unknown as Record<string, Session>
+    expect(exerciseRepBand(prefillOnly, id, asOf).count).toBe(0)
+  })
+
+  it('other exercises’ sessions do not advance this one', () => {
+    expect(exerciseRepBand(nSessionsBefore('rdl', 12, asOf), id, asOf).count).toBe(0)
+  })
+
+  it(`a ${BAND_REGRESS_GAP_DAYS}+ day break drops one band until ${BAND_REBUILD_SESSIONS} sessions rebuild it`, () => {
+    // 10 sessions long ago (band 2 earned), then a 40-day gap to today.
+    const old = sessionsOn(id, Array.from({ length: 10 }, (_, i) => `2026-06-${String(i + 1).padStart(2, '0')}`))
+    const afterBreak = exerciseRepBand(old, id, '2026-07-20')
+    expect(afterBreak).toMatchObject({ band: 1, countBand: 2 })
+    expect(afterBreak.regressed).toMatchObject({ sessionsSince: 0, sessionsToRestore: BAND_REBUILD_SESSIONS })
+
+    // Two comeback sessions: still one short of restoring.
+    const twoBack = { ...old, ...sessionsOn(id, ['2026-07-20', '2026-07-22']) }
+    expect(exerciseRepBand(twoBack, id, '2026-07-24')).toMatchObject({
+      band: 1, countBand: 2, regressed: { sessionsSince: 2, sessionsToRestore: 1 },
+    })
+
+    // Third comeback session: earned band restored (fast, not 8 sessions).
+    const threeBack = { ...twoBack, ...sessionsOn(id, ['2026-07-24']) }
+    const restored = exerciseRepBand(threeBack, id, '2026-07-26')
+    expect(restored.band).toBe(2)
+    expect(restored.regressed).toBeUndefined()
+  })
+
+  it('band 1 never regresses below 1', () => {
+    const few = sessionsOn(id, ['2026-06-01', '2026-06-03'])
+    expect(exerciseRepBand(few, id, '2026-09-25')).toEqual({ band: 1, count: 2, countBand: 1 })
+  })
+})
+
+describe('explainRepTarget', () => {
+  const bench = getExercise('dumbbell-bench-press')!
+  const asOf = '2026-09-25'
+  const bandInfo = (n: number) => exerciseRepBand(nSessionsBefore(bench.id, n, asOf), bench.id, asOf)
+
+  it('reports the band and the band target', () => {
+    const e = explainRepTarget(bench, bandInfo(8))
+    expect(e.band).toBe(2)
+    expect(e.target).toEqual(repTargetFor(bench, 2))
+    expect(e.banded).toBe(true)
+  })
+
+  it('describes the target in words, from the session count', () => {
+    const text = describeRepTarget(explainRepTarget(bench, bandInfo(8)))
+    expect(text).toContain('3 x 8 reps')
+    expect(text).toContain('logged this exercise 8 times')
+  })
+
+  it('flags the first session of a newly earned band with the ~10% weight nudge', () => {
+    const e = explainRepTarget(bench, bandInfo(8)) // today is session 9
+    expect(e.justAdvanced).toBe(true)
+    expect(describeRepTarget(e)).toContain('about 10% weight')
+    expect(explainRepTarget(bench, bandInfo(9)).justAdvanced).toBe(false)
+  })
+
+  it('explains a break regression and how fast the band comes back', () => {
+    const old = sessionsOn(bench.id, Array.from({ length: 10 }, (_, i) => `2026-06-${String(i + 1).padStart(2, '0')}`))
+    const e = explainRepTarget(bench, exerciseRepBand(old, bench.id, '2026-07-20'))
+    expect(e.regressed).toBeTruthy()
+    const text = describeRepTarget(e)
+    expect(text).toContain('one band lower')
+    expect(text).toContain(`${BAND_REBUILD_SESSIONS} more sessions`)
+  })
+
+  it('appends the authored repScheme note when the exercise has one', () => {
+    const facePull = getExercise('face-pull')!
+    const text = describeRepTarget(explainRepTarget(facePull, exerciseRepBand({}, facePull.id, asOf)))
+    expect(text).toContain('3 x 15 reps')
+    expect(text.endsWith(facePull.rationale!.repScheme!)).toBe(true)
+    // Fixed-target exercises get the note too (curl deviates on purpose).
+    const curl = getExercise('dumbbell-curl')!
+    expect(describeRepTarget(explainRepTarget(curl, exerciseRepBand({}, curl.id, asOf))))
+      .toContain(curl.rationale!.repScheme!)
+  })
+})
+
+describe('INCREMENTS export', () => {
+  it('matches the documented steps per equipment', () => {
+    expect(INCREMENTS).toEqual({
+      dumbbell: 1, legPress: 5, rdl: 2.5, cable: 2.5, bodyweight: null, timed: null,
+    })
   })
 })
 
@@ -117,23 +229,6 @@ describe('suggestNextWeight', () => {
   })
 })
 
-describe('repBandFor', () => {
-  it('returns band 1 for weeks 1-8', () => {
-    expect(repBandFor(1)).toBe(1)
-    expect(repBandFor(8)).toBe(1)
-  })
-
-  it('returns band 2 starting at week 9', () => {
-    expect(repBandFor(9)).toBe(2)
-    expect(repBandFor(16)).toBe(2)
-  })
-
-  it('returns band 3 starting at week 17', () => {
-    expect(repBandFor(17)).toBe(3)
-    expect(repBandFor(26)).toBe(3)
-  })
-})
-
 describe('repTargetFor', () => {
   const bench = getExercise('dumbbell-bench-press')!
   const rdl = getExercise('rdl')!
@@ -148,12 +243,12 @@ describe('repTargetFor', () => {
   })
 
   it('compound: 3x8 in band 2', () => {
-    const t = repTargetFor(bench, 9)
+    const t = repTargetFor(bench, 2)
     expect(t).toEqual({ sets: 3, reps: 8 })
   })
 
   it('compound: 4x6 in band 3', () => {
-    const t = repTargetFor(bench, 17)
+    const t = repTargetFor(bench, 3)
     expect(t).toEqual({ sets: 4, reps: 6 })
   })
 
@@ -162,59 +257,71 @@ describe('repTargetFor', () => {
   })
 
   it('RDL: 3x10 in band 2 (lags compounds)', () => {
-    expect(repTargetFor(rdl, 9)).toEqual({ sets: 3, reps: 10 })
+    expect(repTargetFor(rdl, 2)).toEqual({ sets: 3, reps: 10 })
   })
 
   it('RDL: 3x8 in band 3', () => {
-    expect(repTargetFor(rdl, 17)).toEqual({ sets: 3, reps: 8 })
+    expect(repTargetFor(rdl, 3)).toEqual({ sets: 3, reps: 8 })
   })
 
   it('accessory (curl): 2x12 in all bands', () => {
     expect(repTargetFor(curl, 1)).toEqual({ sets: 2, reps: 12 })
-    expect(repTargetFor(curl, 9)).toEqual({ sets: 2, reps: 12 })
-    expect(repTargetFor(curl, 17)).toEqual({ sets: 2, reps: 12 })
+    expect(repTargetFor(curl, 2)).toEqual({ sets: 2, reps: 12 })
+    expect(repTargetFor(curl, 3)).toEqual({ sets: 2, reps: 12 })
   })
 
   it('Plank: seconds progression 30/45/60', () => {
     expect(repTargetFor(plank, 1)).toEqual({ sets: 3, seconds: 30 })
-    expect(repTargetFor(plank, 9)).toEqual({ sets: 3, seconds: 45 })
-    expect(repTargetFor(plank, 17)).toEqual({ sets: 3, seconds: 60 })
+    expect(repTargetFor(plank, 2)).toEqual({ sets: 3, seconds: 45 })
+    expect(repTargetFor(plank, 3)).toEqual({ sets: 3, seconds: 60 })
   })
 
   it('Face Pull: 3x15 in bands 1 and 2, 3x12 in band 3', () => {
     // Band 1 is reachable now that a logged Face Pull survives a week drop:
     // same load, 15 reps instead of 12 — a volume increase, which is fine.
     expect(repTargetFor(facePull, 1)).toEqual({ sets: 3, reps: 15 })
-    expect(repTargetFor(facePull, 9)).toEqual({ sets: 3, reps: 15 })
-    expect(repTargetFor(facePull, 17)).toEqual({ sets: 3, reps: 12 })
+    expect(repTargetFor(facePull, 2)).toEqual({ sets: 3, reps: 15 })
+    expect(repTargetFor(facePull, 3)).toEqual({ sets: 3, reps: 12 })
   })
 
   it('Pallof: 3x10/side all bands, addLoad in band 3', () => {
     expect(repTargetFor(pallof, 1)).toEqual({ sets: 3, reps: 10 })
-    expect(repTargetFor(pallof, 9)).toEqual({ sets: 3, reps: 10 })
-    expect(repTargetFor(pallof, 17)).toEqual({ sets: 3, reps: 10, addLoad: true })
+    expect(repTargetFor(pallof, 2)).toEqual({ sets: 3, reps: 10 })
+    expect(repTargetFor(pallof, 3)).toEqual({ sets: 3, reps: 10, addLoad: true })
   })
 })
 
-describe('Workout B catalog (v2-2)', () => {
+describe('Workout B catalog', () => {
   const workoutB = WORKOUTS.find(w => w.id === 'B')!
 
   it('does not contain retired exercises', () => {
     const ids = workoutB.exercises.map(e => e.id)
-    expect(ids).not.toContain('back-extension')
+    // v2-2 swapped the tricep pushdown and bird dog out; the machine back
+    // extension retired then too, but a WEIGHTED back extension returned in
+    // plan v6 as B's direct lower-back hinge.
     expect(ids).not.toContain('tricep-pushdown')
     expect(ids).not.toContain('bird-dog')
   })
 
   it('contains the expected exercise list in order', () => {
     const ids = workoutB.exercises.map(e => e.id)
-    // Standing calf raise moved to A to even out the two gym days (plan v4).
-    expect(ids).toEqual(['leg-press', 'single-arm-row', 'lat-pulldown', 'dumbbell-curl', 'overhead-tricep-extension', 'pallof-press', 'face-pull'])
+    // Standing calf raise moved to A (plan v4); back extension joined after
+    // the lat pulldown (plan v6) as the lower-back hinge B lacked.
+    expect(ids).toEqual(['leg-press', 'single-arm-row', 'lat-pulldown', 'back-extension', 'dumbbell-curl', 'overhead-tricep-extension', 'pallof-press', 'face-pull'])
   })
 
   it('getExercise returns undefined for retired ids', () => {
-    expect(getExercise('back-extension')).toBeUndefined()
     expect(getExercise('tricep-pushdown')).toBeUndefined()
     expect(getExercise('bird-dog')).toBeUndefined()
+  })
+
+  it('back extension: weighted single-implement hinge, fixed 3x12', () => {
+    const be = getExercise('back-extension')!
+    expect(be.requiresKg).toBe(true)
+    expect(be.load).toBe('single')
+    expect(be.safetyCues).toContain('back')
+    expect(be.repProgression).toEqual({
+      band1: { sets: 3, reps: 12 }, band2: { sets: 3, reps: 12 }, band3: { sets: 3, reps: 12 },
+    })
   })
 })

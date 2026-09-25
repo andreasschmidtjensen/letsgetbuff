@@ -1,5 +1,5 @@
 import { useStore } from '../store/store'
-import { QUALITATIVE_MILESTONES, WORKOUTS } from '@letsgetbuff/shared'
+import { QUALITATIVE_MILESTONES, WORKOUTS, loadSuffix } from '@letsgetbuff/shared'
 
 const WEIGHTED_EXERCISES = Array.from(
   new Map(
@@ -62,7 +62,7 @@ export default function MilestonesView() {
                 <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
                   <span style={{ fontSize: 13, fontWeight: 600 }}>{exercise.name}</span>
                   <span style={{ fontSize: 12, color: done ? 'var(--green)' : 'var(--text-muted)' }}>
-                    {done ? 'done ' : ''}{current}kg / {target}kg
+                    {done ? 'done ' : ''}{current}kg / {target}kg{loadSuffix(exercise)}
                   </span>
                 </div>
                 <div style={{ background: 'var(--surface2)', borderRadius: 4, height: 6, overflow: 'hidden' }}>
@@ -75,7 +75,7 @@ export default function MilestonesView() {
                   }} />
                 </div>
                 <div className="muted mt-4" style={{ fontSize: 11 }}>
-                  Start: {start}kg &middot; {done ? 'Goal reached!' : `${Math.round((target - current) * 10) / 10}kg to go`}
+                  Start: {start}kg{loadSuffix(exercise)} &middot; {done ? 'Goal reached!' : `${Math.round((target - current) * 10) / 10}kg to go`}
                 </div>
               </div>
             )

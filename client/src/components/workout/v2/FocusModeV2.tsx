@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../../../store/store'
 import { sendProxyLog } from '../../../store/persistence'
 import { useTestMode } from '../../../store/testMode'
-import { repTargetFor, suggestNextWeight, keyToDate, loggedExerciseIds } from '@letsgetbuff/shared'
+import { repTargetFor, exerciseRepBand, suggestNextWeight, keyToDate, loggedExerciseIds } from '@letsgetbuff/shared'
 import type { ExerciseDef, ExerciseEntry, SetEntry, Session } from '@letsgetbuff/shared'
 import TestModeBanner from '../../TestModeBanner'
 import { SessionTimer, VideoPanel } from '../timers'
@@ -94,7 +94,9 @@ export default function FocusModeV2(props: FocusModeV2Props) {
 
   if (!ex) return null
 
-  const target = repTargetFor(ex, programWeek)
+  // Rep band from this exercise's own history (sessions before today).
+  const bandInfo = exerciseRepBand(state.sessions, ex.id, dateStr)
+  const target = repTargetFor(ex, bandInfo.band)
   const restSecs = getRestSecs(ex.id) ?? restDefaultSecs
 
   const selfSets = state.sessions[dateStr]?.entries[ex.id]?.sets ?? []
@@ -175,8 +177,8 @@ export default function FocusModeV2(props: FocusModeV2Props) {
   const selfLane = liveLane(selfLaneKey)
   const partnerLane = liveLane(partnerLaneKey)
 
-  const selfDone = exerciseDoneInV2(state.sessions, dateStr, ex, programWeek)
-  const partnerDone = shared ? exerciseDoneInV2(partnerState!.sessions, dateStr, ex, programWeek) : true
+  const selfDone = exerciseDoneInV2(state.sessions, dateStr, ex)
+  const partnerDone = shared ? exerciseDoneInV2(partnerState!.sessions, dateStr, ex) : true
   const allDone = selfDone && partnerDone
 
   const partnerLoggedSets = partnerSets.filter(s => setComplete(s, ex)).length
@@ -211,6 +213,7 @@ export default function FocusModeV2(props: FocusModeV2Props) {
             <ExplainWhy
               exercise={ex}
               programWeek={programWeek}
+              bandInfo={bandInfo}
               loggedIds={loggedIds}
               lastWeight={lastWeight}
               feltEasy={prev?.feltEasy ?? false}

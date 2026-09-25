@@ -32,7 +32,7 @@ import { useUiVersion } from '../store/uiVersion'
 import { getSessionStart, startSessionClock, endSessionClock } from '../components/workout/v2/sessionClock'
 import { computeProgramWeek, scheduleFor, todayDayName, loggedExerciseIds } from '@letsgetbuff/shared'
 import { todayKey, keyToDate } from '@letsgetbuff/shared'
-import { getWorkoutExercises, getWorkout, ExerciseDef, repBandFor } from '@letsgetbuff/shared'
+import { getWorkoutExercises, getWorkout, ExerciseDef, exerciseRepBand } from '@letsgetbuff/shared'
 import { Session } from '@letsgetbuff/shared'
 import type { Privilege, Tab } from '@letsgetbuff/shared'
 
@@ -144,14 +144,21 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
   const programWeek = state.startDate
     ? computeProgramWeek(state.startDate, state.skippedWeeks, state.sessions, keyToDate(dateStr))
     : 1
-  const restDefaultSecs = restPrefSecs ?? (repBandFor(programWeek) === 3 ? 150 : REST_SECS_DEFAULT)
-
   // "Once trained, always yours": an exercise already logged stays in the plan
   // even if the program week later drops below its minWeek.
   const loggedIds = useMemo(() => loggedExerciseIds(state.sessions), [state.sessions])
 
   const planExercises = getWorkoutExercises(workoutType, programWeek, loggedIds)
   const planOrder = planExercises.map(e => e.id)
+
+  // Rep bands are per exercise (session-count based) since v51. The default
+  // rest stretches to 2.5 min once any of today's lifts is in the 4x6 band.
+  const bandFor = useCallback(
+    (exerciseId: string) => exerciseRepBand(state.sessions, exerciseId, dateStr).band,
+    [state.sessions, dateStr],
+  )
+  const maxBand = planExercises.reduce<number>((m, e) => Math.max(m, bandFor(e.id)), 1)
+  const restDefaultSecs = restPrefSecs ?? (maxBand === 3 ? 150 : REST_SECS_DEFAULT)
 
   // ── Phase 13: session resolution (alone / with-partner / resume) ──────────
   interface SessionInfo { id: number; mode: 'solo' | 'shared'; participants: { username: string }[] }
@@ -373,6 +380,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
           onDateChange={handleDateChange}
           onWorkoutTypeChange={setWorkoutType}
           programWeek={programWeek}
+          bandFor={bandFor}
           exercises={exercises}
           liveOrder={liveOrder}
           sensors={sensors}
@@ -519,13 +527,6 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
             <span className="muted" style={{ fontSize: 13 }}>
               Warmup: {getWorkout(workoutType)?.warmup}
             </span>
-          </div>
-        )}
-
-        {repBandFor(programWeek) > repBandFor(programWeek - 1) && programWeek > 1 && (
-          <div className="card mb-12" style={{ borderColor: 'var(--accent)' }} role="note">
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>New rep phase</div>
-            <div className="muted" style={{ fontSize: 12 }}>Rep range dropped. Consider increasing weight ~10%.</div>
           </div>
         )}
 

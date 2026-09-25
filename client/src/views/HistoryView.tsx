@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useStore } from '../store/store'
 import { isGuestMode } from '../store/guest'
 import { useContainerWidth } from '../lib/useContainerWidth'
-import { WORKOUTS } from '@letsgetbuff/shared'
+import { WORKOUTS, loadSuffix } from '@letsgetbuff/shared'
 import type { ExerciseDef, Session } from '@letsgetbuff/shared'
 
 // ── 1RM formula (Epley) ──────────────────────────────────────────────────────
@@ -228,6 +228,8 @@ export default function HistoryView({ username }: { username: string }) {
   }, [])
 
   const exercise = ALL_EXERCISES.find(e => e.id === selectedId)
+  // '/hand' etc. after weight figures — deltas and volume stay unit-plain.
+  const suffix = exercise ? loadSuffix(exercise) : ''
 
   // ── Lifts tab ─────────────────────────────────────────────────────────────
 
@@ -340,7 +342,7 @@ export default function HistoryView({ username }: { username: string }) {
                     </div>
                     <div style={{ flex: 1, minWidth: 80 }}>
                       <div className="muted" style={{ fontSize: 11 }}>Top weight</div>
-                      <div style={{ fontWeight: 700, fontSize: 20 }}>{latest.topKg}kg</div>
+                      <div style={{ fontWeight: 700, fontSize: 20 }}>{latest.topKg}kg{suffix}</div>
                     </div>
                     <div style={{ flex: 1, minWidth: 80 }}>
                       <div className="muted" style={{ fontSize: 11 }}>Est. 1RM</div>
@@ -415,7 +417,7 @@ export default function HistoryView({ username }: { username: string }) {
                     >
                       <span className="muted">{d.date}</span>
                       <span>
-                        <strong>{d.topKg}kg</strong>
+                        <strong>{d.topKg}kg{suffix}</strong>
                         <span className="muted"> × {d.topReps} reps</span>
                         <span style={{ color: 'var(--blue)', marginLeft: 8, fontSize: 11 }}>
                           1RM≈{d.e1rm}kg
@@ -443,7 +445,7 @@ export default function HistoryView({ username }: { username: string }) {
                     >
                       <span className="muted">{d.date}</span>
                       <span>
-                        <strong style={{ color: 'var(--blue)' }}>{d.topKg}kg</strong>
+                        <strong style={{ color: 'var(--blue)' }}>{d.topKg}kg{suffix}</strong>
                         <span className="muted"> × {d.topReps} reps</span>
                         <span style={{ color: 'var(--blue)', marginLeft: 8, fontSize: 11 }}>
                           1RM≈{d.e1rm}kg

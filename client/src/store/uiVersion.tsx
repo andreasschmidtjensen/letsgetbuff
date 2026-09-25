@@ -26,7 +26,9 @@ export function getUiV2(): boolean {
   } catch {
     // A malformed URL must not keep the app from booting.
   }
-  return localStorage.getItem(UI_V2_KEY) === '1'
+  // v2 is the default since v51 — only an explicit opt-out ('0', via the chip
+  // or ?ui=v1) keeps a device on the classic screens.
+  return localStorage.getItem(UI_V2_KEY) !== '0'
 }
 
 export function setUiV2(on: boolean): void {

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { kgCaption } from '@letsgetbuff/shared'
 import type { ExerciseDef, SetEntry } from '@letsgetbuff/shared'
 import { ExerciseTimer } from '../timers'
 import { formatDuration } from '../helpers'
@@ -229,7 +230,7 @@ export default function ExerciseCardV2(props: ExerciseCardV2Props) {
             {exercise.requiresKg && (
               <div className="v2-fields">
                 <label className="v2-field-col">
-                  <span className="v2-field-cap">KG</span>
+                  <span className="v2-field-cap">{kgCaption(exercise)}</span>
                   <input
                     type="number" inputMode="decimal" className="v2-field" min={0} step={0.5}
                     value={kgValue}
@@ -239,7 +240,7 @@ export default function ExerciseCardV2(props: ExerciseCardV2Props) {
                 </label>
                 {together && (
                   <label className="v2-field-col">
-                    <span className="v2-field-cap">{together.label.toUpperCase()} KG</span>
+                    <span className="v2-field-cap">{together.label.toUpperCase()} {kgCaption(exercise)}</span>
                     <input
                       type="number" inputMode="decimal" className="v2-field" min={0} step={0.5}
                       value={kg2Value}
@@ -274,7 +275,7 @@ export default function ExerciseCardV2(props: ExerciseCardV2Props) {
             <div className="v2-fields">
               {exercise.requiresKg && (
                 <label className="v2-field-col">
-                  <span className="v2-field-cap">KG</span>
+                  <span className="v2-field-cap">{kgCaption(exercise)}</span>
                   <input
                     type="number" inputMode="decimal" className="v2-field" min={0} step={0.5}
                     value={kgValue}
@@ -296,7 +297,7 @@ export default function ExerciseCardV2(props: ExerciseCardV2Props) {
             {together && exercise.requiresKg && (
               <div className="v2-fields">
                 <label className="v2-field-col">
-                  <span className="v2-field-cap">{together.label.toUpperCase()} KG</span>
+                  <span className="v2-field-cap">{together.label.toUpperCase()} {kgCaption(exercise)}</span>
                   <input
                     type="number" inputMode="decimal" className="v2-field" min={0} step={0.5}
                     value={kg2Value}
@@ -321,7 +322,7 @@ export default function ExerciseCardV2(props: ExerciseCardV2Props) {
             <div className="v2-fields">
               {exercise.requiresKg && (
                 <label className="v2-field-col">
-                  <span className="v2-field-cap">KG</span>
+                  <span className="v2-field-cap">{kgCaption(exercise)}</span>
                   <input
                     type="number" inputMode="decimal" className="v2-field" min={0} step={0.5}
                     value={kgValue}
@@ -359,7 +360,7 @@ export default function ExerciseCardV2(props: ExerciseCardV2Props) {
                 <div className="v2-fields">
                   {exercise.requiresKg && (
                     <label className="v2-field-col">
-                      <span className="v2-field-cap">KG</span>
+                      <span className="v2-field-cap">{kgCaption(exercise)}</span>
                       <input
                         type="number" inputMode="decimal" className="v2-field" min={0} step={0.5}
                         value={kg2Value}

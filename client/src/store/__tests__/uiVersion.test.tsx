@@ -22,7 +22,9 @@ beforeEach(() => {
 
 afterEach(() => { vi.unstubAllGlobals() })
 
-test('defaults to off', () => {
+test('defaults to ON (v2 is the main UI since v51); explicit opt-out sticks', () => {
+  expect(getUiV2()).toBe(true)
+  setUiV2(false)
   expect(getUiV2()).toBe(false)
 })
 

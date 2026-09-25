@@ -62,7 +62,17 @@ Timed exercises:
 - 2–3 alternative exercise names (strings), no URLs needed.
 
 ## Notes:
-- 1–2 coaching cues, concise. Include safety note if safetyCues is non-empty.`
+- 1–2 coaching cues, concise. Include safety note if safetyCues is non-empty.
+
+## Load labeling (the "load" field — what the kg number the user logs means):
+- "perHand" — one dumbbell in EACH hand (e.g. bench press, lunge, curl)
+- "single"  — one implement total (e.g. single-arm row, overhead tricep extension, goblet-style holds)
+- "total"   — the whole machine stack or barbell (e.g. lat pulldown, leg press, face pull)
+Required whenever requiresKg is true; omit for unweighted exercises.
+
+## Rationale (the "rationale" field — why the exercise earns its place):
+- "purpose": 1–2 sentences on muscles/purpose and its role in the programme (always required).
+- "repScheme": ONLY when the rep scheme deviates from the standard bands (e.g. high-rep shoulder-health work, fixed-rep isolation) — explain why the deviation is the point. Omit otherwise.`
 
 // ---------------------------------------------------------------------------
 // Tool definition — describes the ExerciseDef shape to Claude
@@ -77,6 +87,7 @@ const EXERCISE_TOOL: Anthropic.Tool = {
     required: [
       'id', 'name', 'sets', 'reps', 'progressionType',
       'requiresKg', 'videoUrls', 'alternatives', 'notes', 'safetyCues', 'repProgression',
+      'rationale',
     ],
     properties: {
       id: { type: 'string', description: 'Kebab-case unique identifier' },
@@ -118,6 +129,26 @@ const EXERCISE_TOOL: Anthropic.Tool = {
       minWeek: {
         type: 'number',
         description: 'Optional: programme week from which this exercise is first shown',
+      },
+      load: {
+        type: 'string',
+        enum: ['perHand', 'single', 'total'],
+        description:
+          'What the logged kg means: perHand = one dumbbell in each hand, single = one implement total, total = machine stack or barbell. Required when requiresKg is true; omit for unweighted.',
+      },
+      rationale: {
+        type: 'object',
+        required: ['purpose'],
+        properties: {
+          purpose: {
+            type: 'string',
+            description: '1-2 sentences: muscles/purpose and role in the programme',
+          },
+          repScheme: {
+            type: 'string',
+            description: 'Only when the rep scheme deviates from the standard bands: why the deviation is the point',
+          },
+        },
       },
       repProgression: {
         type: 'object',
@@ -257,6 +288,22 @@ export function validateExerciseDef(raw: unknown): { exercise: ExerciseDef; warn
     safetyCues: r.safetyCues as Array<'knee' | 'back'>,
     ...(r.minWeek != null ? { minWeek: r.minWeek as number } : {}),
     repProgression: rp as ExerciseDef['repProgression'],
+    // Optional since plan v5. Old stored proposals lack them and must still
+    // approve, so: accept valid values, silently drop invalid, never throw.
+    ...(r.load === 'perHand' || r.load === 'single' || r.load === 'total'
+      ? { load: r.load }
+      : {}),
+    ...(typeof r.rationale === 'object' && r.rationale !== null &&
+        typeof (r.rationale as Record<string, unknown>).purpose === 'string'
+      ? {
+          rationale: {
+            purpose: (r.rationale as Record<string, unknown>).purpose as string,
+            ...(typeof (r.rationale as Record<string, unknown>).repScheme === 'string'
+              ? { repScheme: (r.rationale as Record<string, unknown>).repScheme as string }
+              : {}),
+          },
+        }
+      : {}),
   }
 
   return { exercise, warnings }

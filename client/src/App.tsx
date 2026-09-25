@@ -11,6 +11,7 @@ import HomeTrainingView from './views/HomeTrainingView'
 import MetricsView from './views/MetricsView'
 import MilestonesView from './views/MilestonesView'
 import SettingsView from './views/SettingsView'
+import ProgramGuideView from './views/ProgramGuideView'
 import LoginView from './views/LoginView'
 import HistoryView from './views/HistoryView'
 import TestModeBanner from './components/TestModeBanner'
@@ -29,6 +30,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'history', label: 'History' },
   { id: 'metrics', label: 'Metrics' },
   { id: 'milestones', label: 'Goals' },
+  { id: 'guide', label: 'Guide' },
   { id: 'settings', label: 'Settings' },
 ]
 
@@ -139,6 +141,7 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
           {tab === 'history'   && <HistoryView username={username} />}
           {tab === 'metrics'   && <MetricsView />}
           {tab === 'milestones'&& <MilestonesView />}
+          {tab === 'guide'     && <ProgramGuideView />}
           {tab === 'settings'  && <SettingsView onLogout={onLogout} level={level} />}
         </div>
       </main>

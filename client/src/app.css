@@ -251,6 +251,12 @@ body {
   font-weight: 600;
 }
 
+/* Nine tabs (Guide joined in v50) get ~41px each on a 375px phone — the default
+   12px labels clip "Settings". Tighten type + padding on narrow screens. */
+@media (max-width: 480px) {
+  .nav-btn { font-size: 10.5px; padding: 10px 1px; letter-spacing: -0.2px; }
+}
+
 /* Common */
 .card {
   background: var(--surface);
@@ -1468,3 +1474,23 @@ h3 { font-size: 15px; margin: 0 0 8px; }
     width: 100%; max-width: 760px; margin-left: auto; margin-right: auto;
   }
 }
+
+/* ── Program Guide ─────────────────────────────────────────────────────────── */
+.guide-intro { font-size: 13px; margin-top: -6px; margin-bottom: 12px; }
+.guide-fine { font-size: 12px; line-height: 1.5; }
+.guide-list { margin: 0 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.55; }
+.guide-list li { margin-bottom: 6px; }
+.guide-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px; }
+.guide-table th {
+  text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-muted); font-weight: 600; padding: 4px 8px 4px 0;
+}
+.guide-table td { padding: 5px 8px 5px 0; border-top: 1px solid var(--border); }
+.guide-exercise { border-top: 1px solid var(--border); padding: 10px 0 2px; }
+.guide-exercise:first-of-type { border-top: none; }
+.guide-exercise-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 8px; flex-wrap: wrap; margin-bottom: 2px;
+}
+.guide-exercise-head .muted { font-size: 12px; white-space: nowrap; }
+.guide-exercise p { margin: 4px 0; font-size: 13px; line-height: 1.5; }

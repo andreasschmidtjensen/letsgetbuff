@@ -60,8 +60,8 @@ export default function FocusMode({ exercises, startIndex, dateStr, programWeek,
   if (onWarmup) {
     allDone = warmupsDone[warmupIdx]
   } else {
-    const selfDone = exerciseDoneIn(state.sessions, dateStr, ex!, programWeek)
-    const partnerDone = shared ? exerciseDoneIn(partnerState!.sessions, dateStr, ex!, programWeek) : true
+    const selfDone = exerciseDoneIn(state.sessions, dateStr, ex!)
+    const partnerDone = shared ? exerciseDoneIn(partnerState!.sessions, dateStr, ex!) : true
     allDone = selfDone && partnerDone
   }
 

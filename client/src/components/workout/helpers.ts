@@ -1,4 +1,4 @@
-import { ExerciseDef, SetEntry, Session, repTargetFor } from '@letsgetbuff/shared'
+import { ExerciseDef, SetEntry, Session, repTargetFor, exerciseRepBand, loadSuffix } from '@letsgetbuff/shared'
 
 // Pure helpers shared by the WorkoutView subtree (timers, logger, focus mode).
 // Extracted from the former single WorkoutView.tsx so the God file could split.
@@ -69,14 +69,14 @@ export function lastSessionBefore(
 }
 
 // Is this exercise fully logged for the given day in the given sessions blob?
-// Mirrors the `confirmed` initialisation inside ExerciseLogger.
+// Mirrors the `confirmed` initialisation inside ExerciseLogger. The rep band
+// comes from the exercise's own history (sessions before dateStr).
 export function exerciseDoneIn(
   sessions: Record<string, Session>,
   dateStr: string,
   ex: ExerciseDef,
-  programWeek: number,
 ): boolean {
-  const target = repTargetFor(ex, programWeek)
+  const target = repTargetFor(ex, exerciseRepBand(sessions, ex.id, dateStr).band)
   const logged = sessions[dateStr]?.entries[ex.id]?.sets ?? []
   const doneCount = logged.filter(s => s.reps !== undefined || s.seconds !== undefined).length
   return doneCount >= target.sets
@@ -84,7 +84,7 @@ export function exerciseDoneIn(
 
 export function formatSet(s: SetEntry, ex: ExerciseDef): string {
   const parts: string[] = []
-  if (ex.requiresKg && s.kg !== undefined) parts.push(`${s.kg}kg`)
+  if (ex.requiresKg && s.kg !== undefined) parts.push(`${s.kg}kg${loadSuffix(ex)}`)
   if (s.reps !== undefined) parts.push(`x${s.reps}`)
   else if (s.seconds !== undefined) parts.push(`${s.seconds}s`)
   return parts.join(' ') || '-'
