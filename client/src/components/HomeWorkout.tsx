@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { useStore } from '../store/store'
 import { useCountdown } from './CountdownTimer'
 import { dateKey, homeWorkoutSteps, homeWorkoutMinutes, HOME_WORKOUT } from '@letsgetbuff/shared'
-import type { HomeStep } from '@letsgetbuff/shared'
+import type { HomeStep, StretchLevelId } from '@letsgetbuff/shared'
 
 // Guided player for the bodyweight home circuit (issue #1). Full-screen
-// overlay in the style of StretchFocus: one timed step at a time (warm-up →
-// work/rest rounds), auto-advancing on each countdown's ding. Finishing logs
-// a `home` ActivityEntry on today — the gym calendar is untouched.
+// overlay in the v2 focus style: one timed step at a time (warm-up →
+// work/rest rounds), auto-advancing on each countdown's ding. Since v52 the
+// circuit runs at the variant levels chosen on the overview, and finishing
+// asks one question — "felt easy?" — which drives the harder-variant
+// suggestion (engine/homeProgression.ts). Logging happens on the finish
+// screen's button, recording the levels actually used.
 
 function fmt(secs: number): string {
   const m = Math.floor(Math.max(0, secs) / 60)
@@ -41,63 +44,72 @@ function StepTimer({ seconds, audioCtx, muted, onComplete }: {
   )
 }
 
-export default function HomeWorkout({ audioCtx, muted, onClose }: {
-  audioCtx: AudioContext | null; muted: boolean; onClose: () => void
+export default function HomeWorkout({ audioCtx, muted, levels, onClose }: {
+  audioCtx: AudioContext | null; muted: boolean
+  /** Variant level per exercise id — chosen on the overview (suggested or overridden). */
+  levels: Record<string, StretchLevelId>
+  onClose: () => void
 }) {
   const { dispatch } = useStore()
-  const steps = homeWorkoutSteps()
+  const steps = homeWorkoutSteps(HOME_WORKOUT, ex => levels[ex.id] ?? 1)
   const [idx, setIdx] = useState(0)
   const [finished, setFinished] = useState(false)
+  const [feltEasy, setFeltEasy] = useState(false)
   const step = steps[idx]
   const nextWork = steps.slice(idx + 1).find(s => s.kind === 'work')
 
   const advance = () => {
-    if (idx + 1 < steps.length) {
-      setIdx(idx + 1)
-    } else {
-      dispatch({
-        type: 'ADD_ACTIVITY',
-        date: dateKey(new Date()),
-        activity: { type: 'home', minutes: homeWorkoutMinutes() },
-      })
-      setFinished(true)
-    }
+    if (idx + 1 < steps.length) setIdx(idx + 1)
+    else setFinished(true)
+  }
+
+  const logAndClose = () => {
+    dispatch({
+      type: 'ADD_ACTIVITY',
+      date: dateKey(new Date()),
+      activity: { type: 'home', minutes: homeWorkoutMinutes(), levels, feltEasy },
+    })
+    onClose()
   }
 
   if (finished) {
     return (
-      <div className="focus-overlay" role="dialog" aria-label="Home workout" aria-modal="true">
-        <div className="focus-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+      <div className="focus-overlay ui-v2 v2-focus" role="dialog" aria-label="Home workout" aria-modal="true">
+        <div className="v2-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
           <span style={{ fontSize: 40 }}>💪</span>
-          <h2 style={{ margin: 0 }}>Workout done!</h2>
-          <span className="muted">{HOME_WORKOUT.name} · ~{homeWorkoutMinutes()} min logged for today.</span>
+          <h2 style={{ margin: 0 }}>Circuit done!</h2>
+          <span className="muted">{HOME_WORKOUT.name} · ~{homeWorkoutMinutes()} min, logged for today.</span>
+          <label className="row gap-8" style={{ alignItems: 'center', fontSize: 14, marginTop: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={feltEasy} onChange={e => setFeltEasy(e.target.checked)} />
+            Felt easy — two easy circuits in a row suggest harder variants
+          </label>
         </div>
-        <div className="focus-nav">
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={onClose}>Close</button>
+        <div className="v2-nav">
+          <button className="v2-nav-btn v2-nav-ready" style={{ flex: 1 }} onClick={logAndClose}>Log &amp; close ✓</button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="focus-overlay" role="dialog" aria-label="Home workout" aria-modal="true">
-      <div className="focus-header">
-        <button className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Exit home workout">Exit</button>
-        <span className="muted" style={{ fontSize: 13 }}>
+    <div className="focus-overlay ui-v2 v2-focus" role="dialog" aria-label="Home workout" aria-modal="true">
+      <div className="v2-header">
+        <button className="v2-header-btn" onClick={onClose} aria-label="Exit home workout">Exit</button>
+        <span className="v2-counter">
           {step.kind === 'warmup'
             ? 'Get moving'
             : `Round ${step.round}/${HOME_WORKOUT.rounds}${step.kind === 'work' ? ` · ${step.exerciseIndex + 1}/${HOME_WORKOUT.exercises.length}` : ''}`}
         </span>
-        <div className="focus-progress-bar" aria-hidden="true">
-          <div className="focus-progress-fill" style={{ width: `${((idx + 1) / steps.length) * 100}%` }} />
+        <div className="v2-progress" aria-hidden="true">
+          <div className="v2-progress-fill" style={{ width: `${((idx + 1) / steps.length) * 100}%` }} />
         </div>
       </div>
-      <div className="focus-body" style={{ textAlign: 'center' }}>
+      <div className="v2-body" style={{ textAlign: 'center' }}>
         <div className="card" style={{ padding: 20 }}>
           <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: stepColor(step.kind), marginBottom: 4 }}>
             {step.kind === 'work' ? 'Work' : step.name}
           </div>
-          <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>
+          <div className="v2-ex-name" style={{ marginBottom: 12 }}>
             {step.kind === 'rest' ? (nextWork ? `Next: ${nextWork.name}` : 'Rest') : step.name}
           </div>
           <StepTimer key={idx} seconds={step.seconds} audioCtx={audioCtx} muted={muted} onComplete={advance} />
@@ -108,9 +120,9 @@ export default function HomeWorkout({ audioCtx, muted, onClose }: {
           )}
         </div>
       </div>
-      <div className="focus-nav">
-        <button className="btn btn-secondary" style={{ flex: 1 }} disabled={idx === 0} onClick={() => setIdx(i => Math.max(0, i - 1))}>Prev</button>
-        <button className="btn btn-primary" style={{ flex: 2 }} onClick={advance}>
+      <div className="v2-nav">
+        <button className="v2-nav-btn" style={{ flex: 1 }} disabled={idx === 0} onClick={() => setIdx(i => Math.max(0, i - 1))}>Prev</button>
+        <button className="v2-nav-btn v2-nav-ready" style={{ flex: 2 }} onClick={advance}>
           {idx + 1 < steps.length ? 'Skip →' : 'Finish ✓'}
         </button>
       </div>

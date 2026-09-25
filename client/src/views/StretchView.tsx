@@ -6,7 +6,8 @@ import { useCountdown } from '../components/CountdownTimer'
 import { preloadTimerSounds } from '../lib/sounds'
 import { dateKey } from '@letsgetbuff/shared'
 import {
-  getSessionStretches, getStretchLevel, suggestStretchLevel,
+  getSessionStretches, getStretchLevel,
+  explainStretchLevel, describeStretchLevel,
 } from '@letsgetbuff/shared'
 import type { StretchDef, StretchLevelId, StretchEntry, SetEntry } from '@letsgetbuff/shared'
 
@@ -55,8 +56,12 @@ function StretchCard({ stretch, dateStr, audioCtx, muted, focus }: {
   stretch: StretchDef; dateStr: string; audioCtx: AudioContext | null; muted: boolean; focus?: boolean
 }) {
   const { state, dispatch } = useStore()
-  const suggested = suggestStretchLevel(state, stretch.id, stretch.startLevel)
+  // Suggested level from this stretch's own history: up after two felt-easy
+  // sessions in a row, one level down after a 28+ day break (fast return).
+  const levelInfo = explainStretchLevel(state, stretch.id, stretch.startLevel)
+  const suggested = levelInfo.level
   const [override, setOverride] = useState<StretchLevelId | null>(null)
+  const [showWhy, setShowWhy] = useState(false)
   const level: StretchLevelId = override ?? suggested
   const lvl = getStretchLevel(stretch, level)
 
@@ -103,10 +108,26 @@ function StretchCard({ stretch, dateStr, audioCtx, muted, focus }: {
         <span className="muted" style={{ fontSize: 12 }}>{stretch.kind === 'flow' ? 'Flow' : 'Hold'} · {lvl.name}</span>
         <div className="row gap-4" style={{ marginLeft: 'auto', alignItems: 'center' }}>
           <button className="btn btn-secondary btn-sm" onClick={() => changeLevel(-1)} disabled={level <= 1} aria-label="Easier level">↓</button>
-          <span style={{ fontSize: 12 }}>Level {level}/3</span>
+          <span style={{ fontSize: 12 }}>Level {level}/3{level !== suggested ? '*' : ''}</span>
           <button className="btn btn-secondary btn-sm" onClick={() => changeLevel(1)} disabled={level >= 3} aria-label="Harder level">↑</button>
+          <button
+            className="btn btn-secondary btn-sm explain-btn"
+            onClick={() => setShowWhy(w => !w)}
+            aria-expanded={showWhy}
+            aria-controls={`stretch-why-${stretch.id}`}
+            aria-label={`Explain why ${stretch.name}`}
+            title="Explain why"
+          >?</button>
         </div>
       </div>
+
+      {showWhy && (
+        <div id={`stretch-why-${stretch.id}`} className="explain-panel mb-8" role="note">
+          <p><strong>Why this stretch</strong><br />{stretch.purpose}</p>
+          <p><strong>Why this level</strong><br />{describeStretchLevel(levelInfo)}{level !== suggested ? ` (You have overridden the suggestion of level ${suggested} for today.)` : ''}</p>
+          <p><strong>When to move up</strong><br />{lvl.progressNote}</p>
+        </div>
+      )}
 
       {showVideo ? (
         <div className="mb-8">
@@ -154,15 +175,15 @@ function StretchFocus({ stretches, startIndex, dateStr, audioCtx, muted, onClose
   const dividerHere = prevKind === 'flow' && cur.kind === 'hold'
 
   return (
-    <div className="focus-overlay" role="dialog" aria-label="Stretch focus mode" aria-modal="true">
-      <div className="focus-header">
-        <button className="btn btn-secondary btn-sm" onClick={() => onClose(false)} aria-label="Exit focus mode">Overview</button>
-        <span className="muted" style={{ fontSize: 13 }}>{cur.kind === 'flow' ? 'Flow' : 'Static holds'} · {idx + 1} / {stretches.length}</span>
-        <div className="focus-progress-bar" aria-hidden="true">
-          <div className="focus-progress-fill" style={{ width: `${((idx + 1) / stretches.length) * 100}%` }} />
+    <div className="focus-overlay ui-v2 v2-focus" role="dialog" aria-label="Stretch focus mode" aria-modal="true">
+      <div className="v2-header">
+        <button className="v2-header-btn" onClick={() => onClose(false)} aria-label="Exit focus mode">Overview</button>
+        <span className="v2-counter">{cur.kind === 'flow' ? 'Flow' : 'Static holds'} · {idx + 1}/{stretches.length}</span>
+        <div className="v2-progress" aria-hidden="true">
+          <div className="v2-progress-fill" style={{ width: `${((idx + 1) / stretches.length) * 100}%` }} />
         </div>
       </div>
-      <div className="focus-body">
+      <div className="v2-body">
         {dividerHere && (
           <div className="card mb-8" role="note" style={{ borderColor: 'var(--accent)' }}>
             <strong>Now the static holds</strong>
@@ -171,12 +192,12 @@ function StretchFocus({ stretches, startIndex, dateStr, audioCtx, muted, onClose
         )}
         <StretchCard key={`${dateStr}-${cur.id}`} stretch={cur} dateStr={dateStr} audioCtx={audioCtx} muted={muted} focus />
       </div>
-      <div className="focus-nav">
-        <button className="btn btn-secondary" style={{ flex: 1 }} disabled={idx === 0} onClick={() => setIdx(i => i - 1)}>Prev</button>
+      <div className="v2-nav">
+        <button className="v2-nav-btn" style={{ flex: 1 }} disabled={idx === 0} onClick={() => setIdx(i => i - 1)}>Prev</button>
         {!isLast ? (
-          <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setIdx(i => i + 1)}>Next →</button>
+          <button className="v2-nav-btn v2-nav-ready" style={{ flex: 2 }} onClick={() => setIdx(i => i + 1)}>Next →</button>
         ) : (
-          <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => onClose(true)}>Finish ✓</button>
+          <button className="v2-nav-btn v2-nav-ready" style={{ flex: 2 }} onClick={() => onClose(true)}>Finish ✓</button>
         )}
       </div>
     </div>

@@ -1,17 +1,26 @@
 import { describe, it, expect } from 'vitest'
-import { HOME_WORKOUT, homeWorkoutSteps, homeWorkoutMinutes } from '../home'
+import { HOME_WORKOUT, homeWorkoutSteps, homeWorkoutMinutes, getHomeLevel } from '../home'
 
-describe('home workout catalog integrity (issue #1)', () => {
+describe('home workout catalog integrity (issue #1, leveled v52)', () => {
   it('fits the 10-15 minute window', () => {
     const mins = homeWorkoutMinutes()
     expect(mins).toBeGreaterThanOrEqual(10)
     expect(mins).toBeLessThanOrEqual(15)
   })
 
-  it('exercise ids are unique and every exercise has cues', () => {
+  it('exercise ids are unique; every exercise has a purpose and three leveled variants', () => {
     const ids = HOME_WORKOUT.exercises.map(e => e.id)
     expect(new Set(ids).size).toBe(ids.length)
-    for (const ex of HOME_WORKOUT.exercises) expect(ex.cues.length).toBeGreaterThan(0)
+    for (const ex of HOME_WORKOUT.exercises) {
+      expect(ex.purpose.length, ex.id).toBeGreaterThan(0)
+      expect(ex.levels.map(l => l.level)).toEqual([1, 2, 3])
+      for (const lvl of ex.levels) {
+        expect(lvl.name.length, `${ex.id} L${lvl.level}`).toBeGreaterThan(0)
+        expect(lvl.cues.length, `${ex.id} L${lvl.level}`).toBeGreaterThan(0)
+        expect(lvl.videoId, `${ex.id} L${lvl.level}`).toMatch(/^[\w-]{11}$/)
+        expect(lvl.progressNote.length, `${ex.id} L${lvl.level}`).toBeGreaterThan(0)
+      }
+    }
   })
 
   it('steps: warm-up first, all exercises per round, no trailing rest', () => {
@@ -24,5 +33,16 @@ describe('home workout catalog integrity (issue #1)', () => {
     const rests = steps.filter(s => s.kind === 'rest')
     expect(rests.length).toBe(work.length - 1)
     for (const s of steps) expect(s.seconds).toBeGreaterThan(0)
+  })
+
+  it('steps use the variant chosen by levelFor', () => {
+    const squats = HOME_WORKOUT.exercises.find(e => e.id === 'bw-squat')!
+    const steps = homeWorkoutSteps(HOME_WORKOUT, ex => (ex.id === 'bw-squat' ? 3 : 1))
+    const squatSteps = steps.filter(s => s.kind === 'work' && s.exerciseIndex === HOME_WORKOUT.exercises.indexOf(squats))
+    for (const s of squatSteps) expect(s.name).toBe(getHomeLevel(squats, 3).name)
+    // Everything else stays at level 1.
+    const pushIdx = HOME_WORKOUT.exercises.findIndex(e => e.id === 'push-up')
+    const pushStep = steps.find(s => s.kind === 'work' && s.exerciseIndex === pushIdx)!
+    expect(pushStep.name).toBe(getHomeLevel(HOME_WORKOUT.exercises[pushIdx], 1).name)
   })
 })

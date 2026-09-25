@@ -33,6 +33,8 @@ export interface StretchLevel {
 export interface StretchDef {
   id: string
   name: string
+  /** Why this stretch is in the routine — mirrors ExerciseDef.rationale.purpose. */
+  purpose: string
   kind: StretchKind
   area: StretchArea[]
   perSide: boolean
@@ -61,14 +63,14 @@ export interface StretchPlan {
 
 interface LevelText { name: string; secs: number; cues: string[]; videoId: string; vertical?: boolean; perSide?: boolean; progressNote: string }
 
-type BaseDef = { id: string; name: string; area: StretchArea[]; perSide: boolean; safetyCues: SafetyCue[] }
+type BaseDef = { id: string; name: string; purpose: string; area: StretchArea[]; perSide: boolean; safetyCues: SafetyCue[] }
 
 function holdStretch(def: BaseDef, texts: [LevelText, LevelText, LevelText]): StretchDef {
   const levels = texts.map((t, i) => ({
     level: (i + 1) as StretchLevelId, name: t.name,
     holdSeconds: t.secs, cues: t.cues, videoId: t.videoId, vertical: t.vertical, perSide: t.perSide, progressNote: t.progressNote,
   })) as [StretchLevel, StretchLevel, StretchLevel]
-  return { id: def.id, name: def.name, kind: 'hold', area: def.area, perSide: def.perSide, safetyCues: def.safetyCues, startLevel: 1, levels }
+  return { id: def.id, name: def.name, purpose: def.purpose, kind: 'hold', area: def.area, perSide: def.perSide, safetyCues: def.safetyCues, startLevel: 1, levels }
 }
 
 function flowStretch(def: BaseDef, texts: [LevelText, LevelText, LevelText]): StretchDef {
@@ -76,14 +78,14 @@ function flowStretch(def: BaseDef, texts: [LevelText, LevelText, LevelText]): St
     level: (i + 1) as StretchLevelId, name: t.name,
     durationSeconds: t.secs, cues: t.cues, videoId: t.videoId, vertical: t.vertical, perSide: t.perSide, progressNote: t.progressNote,
   })) as [StretchLevel, StretchLevel, StretchLevel]
-  return { id: def.id, name: def.name, kind: 'flow', area: def.area, perSide: def.perSide, safetyCues: def.safetyCues, startLevel: 1, levels }
+  return { id: def.id, name: def.name, purpose: def.purpose, kind: 'flow', area: def.area, perSide: def.perSide, safetyCues: def.safetyCues, startLevel: 1, levels }
 }
 
 // ── Static-holds routine ─────────────────────────────────────────────────────
 
 const HOLD_STRETCHES: StretchDef[] = [
   holdStretch(
-    { id: 'quad', name: 'Quad / hip-front', area: ['quads', 'hipFlexors'], perSide: true, safetyCues: ['knee'] },
+    { id: 'quad', name: 'Quad / hip-front', purpose: 'Front-of-thigh and hip length for deep lunges and squats - the antidote to sitting and cycling.', area: ['quads', 'hipFlexors'], perSide: true, safetyCues: ['knee'] },
     [
       { name: 'Supported standing quad', secs: 25, cues: ['Hold a wall for balance', 'Heel to glute, knees together', 'Tuck the pelvis — no arching'], videoId: 'LHesB7TJW6c', vertical: true, progressNote: 'Ready when balance is easy and the heel reaches the glute.' },
       { name: 'Free-standing quad', secs: 30, cues: ['No support', 'Soft bend in the standing knee', 'Ribs down, glute squeezed'], videoId: 'AgaPoGEYTZ4', vertical: true, progressNote: 'Ready when you can hold steady and it feels mild.' },
@@ -91,7 +93,7 @@ const HOLD_STRETCHES: StretchDef[] = [
     ],
   ),
   holdStretch(
-    { id: 'hip-flexor', name: 'Hip flexors', area: ['hipFlexors'], perSide: true, safetyCues: ['back'] },
+    { id: 'hip-flexor', name: 'Hip flexors', purpose: 'Opens the hip front that sitting keeps short; protects the lower back whenever you stand tall or hinge.', area: ['hipFlexors'], perSide: true, safetyCues: ['back'] },
     [
       { name: 'Half-kneeling hip flexor', secs: 30, cues: ['Squeeze the back glute', 'Hips drift forward', 'Ribs down — no arch'], videoId: 'nJVogxD2eck', vertical: true, progressNote: 'Ready when the front of the hip stretches without low-back pinch.' },
       { name: '+ overhead reach & side-bend', secs: 30, cues: ['Same base position', 'Raise the same-side arm', 'Bend gently away'], videoId: 'cUfEiSZFVSY', vertical: true, progressNote: 'Ready when the reach feels controlled.' },
@@ -99,7 +101,7 @@ const HOLD_STRETCHES: StretchDef[] = [
     ],
   ),
   holdStretch(
-    { id: 'hamstring', name: 'Hamstrings', area: ['hamstrings'], perSide: true, safetyCues: ['back'] },
+    { id: 'hamstring', name: 'Hamstrings', purpose: 'Length behind the thigh for hinging with a flat back - directly serves the RDL and back extension.', area: ['hamstrings'], perSide: true, safetyCues: ['back'] },
     [
       { name: 'Standing flat-back hinge', secs: 25, cues: ['Heel forward, toes up', 'Hinge at the hips — FLAT BACK', 'Chest tall, hands on thigh'], videoId: 'LVY692zJK0A', progressNote: 'Ready when you reach mid-shin with a flat back.' },
       { name: 'Heel elevated, reach to shin', secs: 30, cues: ['Front heel on a low edge', 'Deeper flat-back hinge', 'Hands slide toward the shin'], videoId: 'Vlhz8JsVB6o', vertical: true, progressNote: 'Ready when the deeper hinge stays flat-backed.' },
@@ -107,7 +109,7 @@ const HOLD_STRETCHES: StretchDef[] = [
     ],
   ),
   holdStretch(
-    { id: 'adductor', name: 'Adductors (groin)', area: ['adductors'], perSide: false, safetyCues: ['knee'] },
+    { id: 'adductor', name: 'Adductors (groin)', purpose: 'Inner-thigh room for deep squats, Cossacks and comfortable side-to-side movement.', area: ['adductors'], perSide: false, safetyCues: ['knee'] },
     [
       { name: 'Seated butterfly', secs: 30, cues: ['Soles together', 'Sit tall, let the knees fall', 'Gentle'], videoId: '5A9mWxYxhGA', vertical: true, progressNote: 'Ready when the knees rest low comfortably.' },
       { name: 'Butterfly + flat-back hinge', secs: 30, cues: ['Hinge forward — flat back', 'Light elbow press on thighs'], videoId: 'dF2olILOtjM', vertical: true, progressNote: 'Ready when the forward hinge feels easy.' },
@@ -115,7 +117,7 @@ const HOLD_STRETCHES: StretchDef[] = [
     ],
   ),
   holdStretch(
-    { id: 'glutes', name: 'Glutes / piriformis', area: ['glutes'], perSide: true, safetyCues: ['back'] },
+    { id: 'glutes', name: 'Glutes / piriformis', purpose: 'Releases the deep hip rotators that tighten from sitting and training - easier squats, happier lower back.', area: ['glutes'], perSide: true, safetyCues: ['back'] },
     [
       { name: 'Lying figure-4', secs: 30, cues: ['Ankle over opposite knee', 'Draw the thigh in', 'Let the crossed knee fall open'], videoId: 'UFLUfFLSBCA', vertical: true, progressNote: 'Ready when you draw the thigh toward the chest easily.' },
       { name: 'Seated figure-4, flat-back lean', secs: 30, cues: ['In a chair, ankle on knee', 'Hinge forward — flat back'], videoId: 'tZ1-JBjT_wE', vertical: true, progressNote: 'Ready when the seated version feels mild.' },
@@ -123,7 +125,7 @@ const HOLD_STRETCHES: StretchDef[] = [
     ],
   ),
   holdStretch(
-    { id: 'calves', name: 'Calves', area: ['calves'], perSide: true, safetyCues: [] },
+    { id: 'calves', name: 'Calves', purpose: 'Ankle range for deep squats and comfortable strides - heels stay down where they belong.', area: ['calves'], perSide: true, safetyCues: [] },
     [
       { name: 'Wall calf, straight leg', secs: 30, cues: ['Hands on wall', 'Back leg straight, heel down', 'Hips forward'], videoId: 'tUA4MO1kXV8', vertical: true, progressNote: 'Ready when the lean feels mild.' },
       { name: '+ bent-knee soleus', secs: 30, cues: ['Softly bend the back knee', 'Reach the lower calf'], videoId: 'vzg233ClYdU', vertical: true, progressNote: 'Ready when both variants feel easy.' },
@@ -131,7 +133,7 @@ const HOLD_STRETCHES: StretchDef[] = [
     ],
   ),
   holdStretch(
-    { id: 'chest', name: 'Chest / pecs', area: ['chest', 'shoulders'], perSide: false, safetyCues: [] },
+    { id: 'chest', name: 'Chest / pecs', purpose: 'Opens the chest and front shoulder that pressing and desk posture round forward - the stretch half of posture work.', area: ['chest', 'shoulders'], perSide: false, safetyCues: [] },
     [
       { name: 'Doorway, forearms low', secs: 30, cues: ['Forearms on the frame, low', 'Step through', 'Shoulders down and back'], videoId: 'CEQMx4zFwYs', progressNote: 'Ready when it feels mild and shoulders stay down.' },
       { name: 'Doorway at shoulder height', secs: 30, cues: ['Elbows ~shoulder height (goalpost)', 'Step through'], videoId: 'M850sCj9LHQ', progressNote: 'Ready when the higher angle feels easy.' },
@@ -139,7 +141,7 @@ const HOLD_STRETCHES: StretchDef[] = [
     ],
   ),
   holdStretch(
-    { id: 'thoracic', name: 'Thoracic rotation', area: ['thoracic', 'shoulders'], perSide: true, safetyCues: [] },
+    { id: 'thoracic', name: 'Thoracic rotation', purpose: 'Upper-back rotation so reaching and twisting come from the mid-spine, not the lower back or neck.', area: ['thoracic', 'shoulders'], perSide: true, safetyCues: [] },
     [
       { name: 'Side-lying open-book', secs: 30, cues: ['Knees stacked and pinned', 'Top arm sweeps open', 'Eyes follow the hand'], videoId: 'qC7jBVTSrCg', vertical: true, progressNote: 'Ready when the top shoulder nears the floor.' },
       { name: 'Quadruped thread-the-needle', secs: 30, cues: ['On all fours', 'Thread one arm under, then reach up'], videoId: 'B8rLOWFLPqU', vertical: true, progressNote: 'Ready when rotation feels free.' },
@@ -147,7 +149,7 @@ const HOLD_STRETCHES: StretchDef[] = [
     ],
   ),
   holdStretch(
-    { id: 'lats', name: 'Lats / side-body', area: ['lats'], perSide: true, safetyCues: [] },
+    { id: 'lats', name: 'Lats / side-body', purpose: 'Side-body length for a full overhead reach - serves the shoulder press and everything above your head.', area: ['lats'], perSide: true, safetyCues: [] },
     [
       { name: 'Standing overhead side-bend', secs: 30, cues: ['Hand on hip', 'Reach the other arm up and lean away', 'Long spine'], videoId: 'Vko-SJok-fk', vertical: true, progressNote: 'Ready when the reach is easy and even.' },
       { name: 'Clasp wrist overhead, side-bend', secs: 30, cues: ['Opposite hand grips the wrist', 'Gently draw it over'], videoId: 'OX5NZLkidtY', progressNote: 'Ready when the deeper pull feels mild.' },
@@ -155,7 +157,7 @@ const HOLD_STRETCHES: StretchDef[] = [
     ],
   ),
   holdStretch(
-    { id: 'shoulders', name: 'Shoulders', area: ['shoulders'], perSide: true, safetyCues: [] },
+    { id: 'shoulders', name: 'Shoulders', purpose: 'Keeps the shoulder capsule and rear delt long, so pressing and pulling move through a full, quiet range.', area: ['shoulders'], perSide: true, safetyCues: [] },
     [
       { name: 'Cross-body shoulder', secs: 30, cues: ['Draw the arm across the chest', 'Cradle the upper arm (not the elbow)', 'Shoulder down — no shrug'], videoId: 'aIq0fLi8iak', vertical: true, progressNote: 'Ready when the arm crosses easily, shoulder down.' },
       { name: 'Cross-body + deeper draw', secs: 30, cues: ['Draw slightly further', 'Tall posture, relaxed traps'], videoId: 'MzQYpR_QDss', vertical: true, progressNote: 'Ready when the deeper draw feels mild.' },
@@ -163,7 +165,7 @@ const HOLD_STRETCHES: StretchDef[] = [
     ],
   ),
   holdStretch(
-    { id: 'neck', name: 'Neck', area: ['neck'], perSide: true, safetyCues: [] },
+    { id: 'neck', name: 'Neck', purpose: 'Releases desk-day neck tension; gentle is the whole point.', area: ['neck'], perSide: true, safetyCues: [] },
     [
       { name: 'Lateral neck stretch', secs: 20, cues: ['Sit or stand tall', 'Let the ear fall toward the shoulder', 'Shoulders stay down'], videoId: 'CdGR0c3UHb4', vertical: true, progressNote: 'Ready when the side of the neck releases without strain.' },
       { name: 'Ear-to-shoulder, light hand assist', secs: 25, cues: ['Rest the hand on the head — weight only, no pull', 'Opposite arm reaches down'], videoId: 'i3GB__ka-2k', vertical: true, progressNote: 'Ready when the assisted hold feels mild.' },
@@ -176,7 +178,7 @@ const HOLD_STRETCHES: StretchDef[] = [
 
 const FLOW_STRETCHES: StretchDef[] = [
   flowStretch(
-    { id: 'cars-sequence', name: 'Joint CARs sequence', area: ['shoulders', 'hipFlexors', 'thoracic'], perSide: false, safetyCues: ['back'] },
+    { id: 'cars-sequence', name: 'Joint CARs sequence', purpose: 'Slow controlled circles through every major joint - a daily oil change and joint-health audit in one.', area: ['shoulders', 'hipFlexors', 'thoracic'], perSide: false, safetyCues: ['back'] },
     [
       { name: 'CARs — major joints', secs: 45, cues: ['Slow controlled circles', 'Neck, shoulders, hips, ankles', 'Biggest circle you can OWN'], videoId: 'jVy0u6m5_KU', progressNote: 'Ready when each circle is smooth and pain-free.' },
       { name: 'CARs — larger + spine & wrists', secs: 45, cues: ['Larger amplitude', 'Add segmental spine + wrists'], videoId: 'p_WqlqgfNrc', progressNote: 'Ready when amplitude is controlled throughout.' },
@@ -184,7 +186,7 @@ const FLOW_STRETCHES: StretchDef[] = [
     ],
   ),
   flowStretch(
-    { id: 'worlds-greatest', name: "World's Greatest Stretch", area: ['hipFlexors', 'thoracic', 'hamstrings', 'glutes'], perSide: false, safetyCues: ['knee', 'back'] },
+    { id: 'worlds-greatest', name: "World's Greatest Stretch", purpose: 'One move covering hips, hamstrings and thoracic rotation - the highest-value warm-up drill there is.', area: ['hipFlexors', 'thoracic', 'hamstrings', 'glutes'], perSide: false, safetyCues: ['knee', 'back'] },
     [
       { name: 'Supported lunge + rotation', secs: 40, cues: ['Hand down for support', 'Small open rotation', 'Back knee soft'], videoId: '-CiWQ2IvY34', progressNote: 'Ready when the lunge + rotation feel stable.' },
       { name: 'Full reach + elbow-to-instep', secs: 40, cues: ['Elbow toward the instep', 'Open reach to the sky'], videoId: 'PE-UuERblwA', vertical: true, progressNote: 'Ready when you reach tall with control.' },
@@ -192,7 +194,7 @@ const FLOW_STRETCHES: StretchDef[] = [
     ],
   ),
   flowStretch(
-    { id: 'deep-squat-sit', name: 'Deep-squat sit + reaches', area: ['hipFlexors', 'adductors', 'thoracic', 'calves'], perSide: false, safetyCues: ['knee'] },
+    { id: 'deep-squat-sit', name: 'Deep-squat sit + reaches', purpose: 'Reclaims the deep resting squat: ankles, hips and upper back opening at the same time.', area: ['hipFlexors', 'adductors', 'thoracic', 'calves'], perSide: false, safetyCues: ['knee'] },
     [
       { name: 'Assisted squat hold', secs: 50, cues: ['Hold support', 'Heels supported if needed', 'Knees track over toes'], videoId: 'w7R7gBRr2SI', vertical: true, progressNote: 'Ready when you sit comfortably at depth.' },
       { name: 'Deep squat + alternating reaches', secs: 50, cues: ['Bodyweight deep squat', 'Drive knees out', 'Alternate reaches'], videoId: 'UFLefaSyvfQ', vertical: true, progressNote: 'Ready when reaches stay balanced.' },
@@ -200,7 +202,7 @@ const FLOW_STRETCHES: StretchDef[] = [
     ],
   ),
   flowStretch(
-    { id: '90-90', name: '90/90 hip switches', area: ['glutes', 'hipFlexors'], perSide: false, safetyCues: ['knee'] },
+    { id: '90-90', name: '90/90 hip switches', purpose: 'Hip internal and external rotation together - ranges that standing life never visits.', area: ['glutes', 'hipFlexors'], perSide: false, safetyCues: ['knee'] },
     [
       { name: 'Small-range switches', secs: 45, cues: ['Hand support', 'Small controlled range', 'Both shins rotate'], videoId: 'CnpUyuEezIk', vertical: true, progressNote: 'Ready when switching feels smooth.' },
       { name: 'Full switches, unsupported', secs: 45, cues: ['No hands', 'Full range each side'], videoId: 'iPqysXFsvTQ', vertical: true, progressNote: 'Ready when unsupported switches are easy.' },
@@ -208,7 +210,7 @@ const FLOW_STRETCHES: StretchDef[] = [
     ],
   ),
   flowStretch(
-    { id: 'cossack-flow', name: 'Cossack squat flow', area: ['adductors', 'hipFlexors', 'calves'], perSide: false, safetyCues: ['knee', 'back'] },
+    { id: 'cossack-flow', name: 'Cossack squat flow', purpose: 'Side-to-side hip and adductor range with control - strength at the wide ends of the squat.', area: ['adductors', 'hipFlexors', 'calves'], perSide: false, safetyCues: ['knee', 'back'] },
     [
       { name: 'Shallow Cossack, supported', secs: 45, cues: ['Hold support', 'Shift side to side', 'Heel may lift'], videoId: 't0-vUUQCsAU', vertical: true, progressNote: 'Ready when the shift feels controlled.' },
       { name: 'Deeper, hands free', secs: 45, cues: ['Heel down', 'Hands free', 'Other leg straight'], videoId: 'VdN137mr2mM', vertical: true, progressNote: 'Ready when depth is comfortable.' },
@@ -216,7 +218,7 @@ const FLOW_STRETCHES: StretchDef[] = [
     ],
   ),
   flowStretch(
-    { id: 'cat-cow-flow', name: 'Cat-cow → segmental flow', area: ['thoracic', 'shoulders'], perSide: false, safetyCues: ['back'] },
+    { id: 'cat-cow-flow', name: 'Cat-cow → segmental flow', purpose: 'Wakes up segmental spine movement before the day loads it - its own CARs for the spine.', area: ['thoracic', 'shoulders'], perSide: false, safetyCues: ['back'] },
     [
       { name: 'Gentle cat-cow', secs: 45, cues: ['Quadruped spinal wave (unloaded)', 'Move slowly within comfort'], videoId: 'WHUevrqeKIg', vertical: true, progressNote: 'Ready when the wave feels smooth.' },
       { name: '+ thread-the-needle', secs: 45, cues: ['Add a reach-through', 'Open through the upper back'], videoId: 'UaDCTUQ5XAI', vertical: true, progressNote: 'Ready when reach-throughs feel free.' },
@@ -240,7 +242,7 @@ export const FULL_BODY_MOBILITY_ROUTINE: StretchRoutine = {
 }
 
 export const DEFAULT_STRETCH_PLAN: StretchPlan = {
-  version: 4, // v4: neck stretch added; hold L3 dose raised to 45s
+  version: 5, // v4: neck stretch + 45s L3 holds; v5: purpose rationale on every stretch
   routines: [MOVEMENT_FLOW_ROUTINE, FULL_BODY_MOBILITY_ROUTINE],
   sessions: [
     { id: 'daily', name: 'Flow + stretch', routineIds: ['movement-flow', 'full-body-mobility'] },

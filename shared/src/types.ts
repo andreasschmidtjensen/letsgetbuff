@@ -11,6 +11,12 @@ export type ActivityType = 'run' | 'bike' | 'stretch' | 'home'
 export interface ActivityEntry {
   type: ActivityType
   minutes?: number // run/bike/home length; stretch sessions are tracked in stretchSessions
+  // Home circuits only (v52) — purely additive like SetEntry.right, no schema
+  // bump: old backups simply lack them and pass through the ladder untouched.
+  /** The variant level each exercise was performed at (exercise id -> 1|2|3). */
+  levels?: Record<string, StretchLevelId>
+  /** Whole-circuit "felt easy" — drives the harder-variant suggestion. */
+  feltEasy?: boolean
 }
 
 export type ProgressionType = 'dumbbell' | 'legPress' | 'rdl' | 'cable' | 'bodyweight' | 'timed'

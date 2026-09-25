@@ -5,7 +5,7 @@ import { useUiVersion } from '../store/uiVersion'
 import TodayCardV2, { WeekCell } from '../components/workout/v2/TodayCardV2'
 import HomeWorkout from '../components/HomeWorkout'
 import { preloadTimerSounds } from '../lib/sounds'
-import { computeProgramWeek, phaseFor, scheduleFor, isoWeekKey, weekKeyToMonday, todayDayName, activityLabel, DayActivity, homeWorkoutMinutes } from '@letsgetbuff/shared'
+import { computeProgramWeek, phaseFor, scheduleFor, isoWeekKey, weekKeyToMonday, todayDayName, activityLabel, DayActivity, homeWorkoutMinutes, HOME_WORKOUT, suggestHomeLevel } from '@letsgetbuff/shared'
 import { dateKey, keyToDate, addDays } from '@letsgetbuff/shared'
 import type { Tab, Session, ActivityEntry, ActivityType } from '@letsgetbuff/shared'
 
@@ -162,6 +162,8 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
     <HomeWorkout
       audioCtx={audioCtxRef.current}
       muted={localStorage.getItem(MUTE_KEY) === '1'}
+      // Suggested variant levels; per-exercise overrides live on the Home training tab.
+      levels={Object.fromEntries(HOME_WORKOUT.exercises.map(e => [e.id, suggestHomeLevel(state, e.id, todayStr)]))}
       onClose={() => setHomeWorkoutOpen(false)}
     />
   ) : null

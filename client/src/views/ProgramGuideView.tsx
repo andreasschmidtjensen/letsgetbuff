@@ -3,6 +3,8 @@ import {
   BAND2_FROM_SESSION, BAND3_FROM_SESSION, BAND_REGRESS_GAP_DAYS, BAND_REBUILD_SESSIONS,
   INCREMENTS, DELOAD_GAP_DAYS, DELOAD_FACTOR,
   kgCaption, describeLoadMode, describeExerciseChoice,
+  HOME_WORKOUT, homeWorkoutMinutes, getHomeLevel, explainHomeLevel, describeHomeLevel,
+  getStretchPlan, explainStretchLevel, STRETCH_EASY_STREAK, STRETCH_REBUILD_SESSIONS,
 } from '@letsgetbuff/shared'
 import type { ExerciseDef, ProgressionType, RepTarget } from '@letsgetbuff/shared'
 import { useStore } from '../store/store'
@@ -166,6 +168,66 @@ export default function ProgramGuideView() {
           })}
         </div>
       ))}
+
+      <div className="card">
+        <div className="card-title">Home circuit: harder variants, not longer intervals</div>
+        <p className="muted guide-fine">
+          ~{homeWorkoutMinutes()} min, {HOME_WORKOUT.rounds} rounds × {HOME_WORKOUT.exercises.length} exercises,
+          {' '}{HOME_WORKOUT.workSeconds}s work / {HOME_WORKOUT.restSeconds}s rest. The six slots cover the
+          gym's patterns — squat, push, single-leg, core brace, hinge — plus the conditioning the gym days
+          don't do. It progresses by <strong>swapping in harder variants</strong>: tick "felt easy" when
+          you finish, and two easy circuits in a row suggest the next one. A {BAND_REGRESS_GAP_DAYS}+ day
+          break drops a variant one level; two circuits bring it back.
+        </p>
+        {HOME_WORKOUT.exercises.map(ex => {
+          const info = explainHomeLevel(state, ex.id, today)
+          return (
+            <div className="guide-exercise" key={ex.id}>
+              <div className="guide-exercise-head">
+                <strong>{ex.name}</strong>
+                <span className="muted">{ex.levels.map(l => l.name).join(' → ')}</span>
+              </div>
+              <p>{ex.purpose}</p>
+              {info.count > 0 && (
+                <p className="muted guide-fine">
+                  Now: {getHomeLevel(ex, info.level).name}. {describeHomeLevel(info)}
+                </p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="card">
+        <div className="card-title">Stretch program: flow first, then holds</div>
+        <p className="muted guide-fine">
+          Every session runs the <strong>movement flow first</strong> (active, full-range — it doubles as
+          the gym-day warm-up) and the <strong>static holds after</strong>, on warm tissue. Each stretch has
+          three levels: {STRETCH_EASY_STREAK} felt-easy sessions in a row at a level suggest the next one,
+          a {BAND_REGRESS_GAP_DAYS}+ day break on a stretch drops it one level
+          ({STRETCH_REBUILD_SESSIONS} sessions restore it — flexibility fades with disuse), and the
+          ↓/↑ buttons override any day.
+        </p>
+        {getStretchPlan().routines.map(r => (
+          <div key={r.id}>
+            <p className="guide-fine" style={{ fontWeight: 600, margin: '10px 0 2px' }}>{r.name}</p>
+            {r.stretches.map(s => {
+              const info = explainStretchLevel(state, s.id, s.startLevel, today)
+              return (
+                <div className="guide-exercise" key={s.id}>
+                  <div className="guide-exercise-head">
+                    <strong>{s.name}</strong>
+                    <span className="muted">
+                      {info.count > 0 ? `level ${info.level}${info.regressed ? ' (break)' : ''}` : `starts at level ${s.startLevel}`}
+                    </span>
+                  </div>
+                  <p>{s.purpose}</p>
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
 
       <p className="muted guide-fine">
         The full review behind these choices — including what the plan could do

@@ -239,7 +239,42 @@ skipped, clamped 1–26) still exists, but now only drives the schedule display,
 the phase label, and `minWeek` onboarding (face pull at week 9, with the "once
 trained, always yours" guard).
 
-## 6. Recommendations
+## 6. The home circuit (v52: leveled variants)
+
+Six timed slots (40s work / 20s rest × 2 rounds, ~13 min) covering the gym's
+movement patterns on days the gym doesn't happen: **squat** (knee-dominant),
+**push-up** (horizontal push), **lunge** (single-leg), **plank** (anti-extension
+core), **glute bridge** (hinge with zero spinal load) and a **conditioning
+finisher** — the heart-rate work the gym days don't cover. Timed intervals
+rather than reps so the whole circuit runs off one countdown and nobody counts.
+
+**Progression swaps in harder variants, not longer intervals** — the session
+should stay a ~13-minute "movement snack". Each slot has three levels
+(e.g. squats → pause squats → jump squats; push-ups → feet-elevated → archer;
+mountain climbers → cross-body → burpees). The engine
+(`shared/src/engine/homeProgression.ts`) mirrors the stretch rule exactly: the
+finish screen asks one question ("felt easy?"), two easy circuits in a row
+suggest the next variant, a 28+ day break drops one level with a two-circuit
+return, and the ↓/↑ override on the Home training tab always wins. The levels
+actually performed are recorded on the day's activity entry, so the suggestion
+is reproducible from the log alone.
+
+## 7. The stretch program
+
+Two routines, always in this order: the **movement flow** first (CARs, world's
+greatest stretch, deep-squat sits, 90/90s, Cossacks, cat-cow — active
+full-range work that doubles as the gym-day warm-up), then the **static holds**
+(hip front, hamstrings, glutes, calves, chest, t-spine, lats, shoulders, neck)
+on warm tissue, where longer holds are productive and safe.
+
+Each stretch has three levels with its own curated video. Progression
+(`shared/src/engine/stretchProgression.ts`): two felt-easy sessions in a row at
+a level suggest the next; since v52 a 28+ day break on a stretch drops it one
+level — flexibility genuinely regresses with disuse — with two sessions to
+restore it; the manual ↓/↑ always wins. Hold doses run 20–45s: long enough for
+tissue to let go, short enough to stay honest.
+
+## 8. Recommendations
 
 Status after v51: items 1, 2 and 5 of the original list are **implemented** —
 rep bands now count each exercise's own logged sessions (with the 28-day

@@ -8,8 +8,8 @@ describe('stretch catalog integrity', () => {
     expect(all.length).toBeGreaterThanOrEqual(16)
   })
 
-  it('plan version is 4 (neck stretch + 45s L3 dose)', () => {
-    expect(DEFAULT_STRETCH_PLAN.version).toBe(4)
+  it('plan version is 5 (purpose rationale on every stretch)', () => {
+    expect(DEFAULT_STRETCH_PLAN.version).toBe(5)
   })
 
   it('every stretch has 3 ascending levels', () => {
