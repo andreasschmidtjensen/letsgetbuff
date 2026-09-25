@@ -52,7 +52,7 @@ interface ExerciseTimerProps {
   onComplete: (achievedSecs: number) => void
   onCancel: () => void
   audioCtx: AudioContext | null
-  onAudioCtxInit: () => AudioContext
+  onAudioCtxInit: () => AudioContext | null
   muted: boolean
 }
 
@@ -87,7 +87,7 @@ export function ExerciseTimer({ targetSecs, onComplete, onCancel, audioCtx, onAu
 interface WarmupChecklistProps {
   steps: WarmupStep[]
   audioCtx: AudioContext | null
-  onAudioCtxInit: () => AudioContext
+  onAudioCtxInit: () => AudioContext | null
   muted: boolean
 }
 
@@ -139,7 +139,7 @@ interface WarmupCardProps {
   done: boolean
   onDone: () => void
   audioCtx: AudioContext | null
-  onAudioCtxInit: () => AudioContext
+  onAudioCtxInit: () => AudioContext | null
   muted: boolean
 }
 

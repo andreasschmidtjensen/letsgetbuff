@@ -25,7 +25,7 @@ interface SideSetStepperProps {
   targetReps?: number
   onLogSide: (side: Side, half: SetEntry) => void
   audioCtx: AudioContext | null
-  onAudioCtxInit: () => AudioContext
+  onAudioCtxInit: () => AudioContext | null
   muted: boolean
   readOnly?: boolean
   /**

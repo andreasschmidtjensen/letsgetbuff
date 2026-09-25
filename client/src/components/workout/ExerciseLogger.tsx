@@ -47,7 +47,7 @@ export interface ExerciseLoggerProps {
   programWeek: number
   onStartFocus?: () => void
   audioCtx: AudioContext | null
-  onAudioCtxInit: () => AudioContext
+  onAudioCtxInit: () => AudioContext | null
   dragHandleListeners?: Record<string, unknown>
   dragHandleAttributes?: DraggableAttributes
   partnerHere?: string

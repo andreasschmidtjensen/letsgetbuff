@@ -194,11 +194,12 @@ export function beep(ctx: AudioContext, freq = 880, duration = 0.12, vol = 0.4):
   osc.stop(ctx.currentTime + duration)
 }
 
-/** "Set logged" chime — two rising tones. On iOS it rides the element route so
- *  the ringer switch cannot mute it (Web Audio would be silenced). */
-export function playDoneSound(ctx: AudioContext): void {
-  if (IS_IOS) {
-    playFile(DONE_WAV, () => { beep(ctx, 880, 0.1, 0.35); setTimeout(() => beep(ctx, 1100, 0.18, 0.3), 120) })
+/** "Set logged" chime — two rising tones. On iOS — and on any browser without
+ *  Web Audio at all — it rides the element route (the ringer switch mutes Web
+ *  Audio, and a missing AudioContext must not mean silence). */
+export function playDoneSound(ctx: AudioContext | null): void {
+  if (IS_IOS || !ctx) {
+    playFile(DONE_WAV, () => { if (ctx) { beep(ctx, 880, 0.1, 0.35); setTimeout(() => beep(ctx, 1100, 0.18, 0.3), 120) } })
     return
   }
   beep(ctx, 880, 0.1, 0.35)
@@ -333,16 +334,18 @@ export function playShout(): void {
 // ── Dispatcher ───────────────────────────────────────────────────────────────
 
 /** Alarm played when a rest / exercise timer runs out — honours the user's choice. */
-export function playTimerEnd(ctx: AudioContext, sound: TimerSound = getTimerSound()): void {
+export function playTimerEnd(ctx: AudioContext | null, sound: TimerSound = getTimerSound()): void {
   // iOS: the ringer switch mutes Web Audio but not <audio> elements, so every
   // choice rides its file twin there (beep/shout included), synth as fallback.
-  if (IS_IOS) {
+  // Same route when the browser has no Web Audio at all (some WebKit builds):
+  // a missing AudioContext must not mean a silent alarm.
+  if (IS_IOS || !ctx) {
     switch (sound) {
-      case 'metal': case 'metal-real': playFile('metal.mp3', () => playMetalChord(ctx)); return
-      case 'chirp': case 'chirp-real': playFile('chirp.mp3', () => playBirdChirp(ctx)); return
-      case 'moan':  case 'moan-real':  playFile('moan.mp3',  () => playMoan(ctx)); return
+      case 'metal': case 'metal-real': playFile('metal.mp3', () => ctx && playMetalChord(ctx)); return
+      case 'chirp': case 'chirp-real': playFile('chirp.mp3', () => ctx && playBirdChirp(ctx)); return
+      case 'moan':  case 'moan-real':  playFile('moan.mp3',  () => ctx && playMoan(ctx)); return
       case 'shout': case 'shout-real': playFile('shout.mp3', () => playShout()); return
-      default: playFile(BEEP_WAV, () => beep(ctx, 660, 0.08, 0.3)); return
+      default: playFile(BEEP_WAV, () => ctx && beep(ctx, 660, 0.08, 0.3)); return
     }
   }
   switch (sound) {
@@ -367,6 +370,6 @@ export function playTimerEnd(ctx: AudioContext, sound: TimerSound = getTimerSoun
  * user gesture in sight): resume a suspended/interrupted context first, then
  * play. Web Audio scheduled on a suspended iOS context is simply lost.
  */
-export function playTimerEndResilient(ctx: AudioContext, sound: TimerSound = getTimerSound()): void {
+export function playTimerEndResilient(ctx: AudioContext | null, sound: TimerSound = getTimerSound()): void {
   void ensureRunning(ctx).then(() => playTimerEnd(ctx, sound))
 }

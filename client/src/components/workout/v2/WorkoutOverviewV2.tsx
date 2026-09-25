@@ -65,7 +65,7 @@ interface WorkoutOverviewV2Props {
   partnerName: string | null
   onChangeParticipants: () => void
   audioCtx: AudioContext | null
-  onAudioCtxInit: () => AudioContext
+  onAudioCtxInit: () => AudioContext | null
   muted: boolean
   liveHint: string
   readOnly?: boolean

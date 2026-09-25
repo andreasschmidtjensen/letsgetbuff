@@ -76,7 +76,7 @@ function remainingOf(lane: Lane, now: number): number {
 interface UseRestLanesOpts {
   muted: boolean
   audioCtx: AudioContext | null
-  resolveAudioCtx?: () => AudioContext
+  resolveAudioCtx?: () => AudioContext | null
 }
 
 export function useRestLanes({ muted, audioCtx, resolveAudioCtx }: UseRestLanesOpts) {
@@ -121,7 +121,7 @@ export function useRestLanes({ muted, audioCtx, resolveAudioCtx }: UseRestLanesO
           const { muted: m, audioCtx: ctx, resolveAudioCtx: resolve } = dingRef.current
           if (!m) {
             const resolved = ctx ?? resolve?.() ?? null
-            if (resolved) playTimerEndResilient(resolved)
+            playTimerEndResilient(resolved) // null ctx still dings via the element route
           }
           if (navigator.vibrate) navigator.vibrate([200, 100, 200])
         }

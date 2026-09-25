@@ -1,0 +1,30 @@
+# Cross-browser e2e suite (Playwright: Chromium, Firefox, WebKit + iPhone
+# profile). Deliberately NOT part of the deploy pipeline — run it on demand
+# before shipping a major feature:
+#   GitHub → Actions → "E2E (on demand)" → Run workflow
+# or locally: npm run e2e
+name: E2E (on demand)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

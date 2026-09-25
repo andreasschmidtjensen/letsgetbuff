@@ -19,7 +19,7 @@ interface UseCountdownOpts {
   audioCtx: AudioContext | null
   muted: boolean
   // Exercise can lazily create an AudioContext on first gesture if none exists yet.
-  resolveAudioCtx?: () => AudioContext
+  resolveAudioCtx?: () => AudioContext | null
   // Called once when the countdown naturally reaches zero, with the full total.
   onComplete?: (achievedSecs: number) => void
 }
@@ -51,7 +51,7 @@ export function useCountdown(opts: UseCountdownOpts): Countdown {
   const endAtRef = useRef(0)
 
   // Keep the latest ding inputs/callback without re-subscribing the interval.
-  const dingRef = useRef<{ audioCtx: AudioContext | null; muted: boolean; resolveAudioCtx?: () => AudioContext; onComplete?: (n: number) => void }>({
+  const dingRef = useRef<{ audioCtx: AudioContext | null; muted: boolean; resolveAudioCtx?: () => AudioContext | null; onComplete?: (n: number) => void }>({
     audioCtx, muted, resolveAudioCtx, onComplete,
   })
   dingRef.current = { audioCtx, muted, resolveAudioCtx, onComplete }
@@ -73,7 +73,7 @@ export function useCountdown(opts: UseCountdownOpts): Countdown {
           const { audioCtx: ctx, muted: m, resolveAudioCtx: resolve, onComplete: done } = dingRef.current
           if (!m) {
             const resolved = ctx ?? resolve?.() ?? null
-            if (resolved) playTimerEndResilient(resolved)
+            playTimerEndResilient(resolved) // null ctx still dings via the element route
           }
           if (navigator.vibrate) navigator.vibrate([200, 100, 200])
           done?.(totalRef.current)
@@ -153,7 +153,7 @@ interface CountdownTimerProps {
   adjustAffectsTotal?: boolean
   audioCtx: AudioContext | null
   muted: boolean
-  resolveAudioCtx?: () => AudioContext
+  resolveAudioCtx?: () => AudioContext | null
   onComplete?: (achievedSecs: number) => void
   cardClass?: string     // extra class on the card (exercise-timer-card)
   ringClass?: string     // extra class on the ring svg

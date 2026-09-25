@@ -41,7 +41,7 @@ interface ExerciseCardV2Props {
   /** A set just became complete — the caller starts the rest lane. */
   onSetComplete: (setIndex: number) => void
   audioCtx: AudioContext | null
-  onAudioCtxInit: () => AudioContext
+  onAudioCtxInit: () => AudioContext | null
   muted: boolean
   readOnly?: boolean
   /**

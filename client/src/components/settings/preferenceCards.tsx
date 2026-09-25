@@ -58,13 +58,12 @@ export function TimerSoundCard() {
   useEffect(() => { preloadTimerSounds() }, [])
 
   const preview = (s: TimerSound) => {
-    if (s === 'shout') { playTimerEnd(null as unknown as AudioContext, s); return }  // uses speech synthesis
+    // No Web Audio (some WebKit builds)? A null ctx rides the element route.
     const Ctor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (!Ctor) return
-    const ctx = new Ctor()
+    const ctx = Ctor && s !== 'shout' ? new Ctor() : null
     unlockAudio(ctx) // iOS: also unlocks the <audio> elements the alarms use
     playTimerEnd(ctx, s)
-    setTimeout(() => ctx.close().catch(() => {}), 2500)
+    if (ctx) setTimeout(() => ctx.close().catch(() => {}), 2500)
   }
 
   const choose = (s: TimerSound) => {

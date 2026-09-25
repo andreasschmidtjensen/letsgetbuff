@@ -97,7 +97,7 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
       const Ctor =
         window.AudioContext ||
         (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-      audioCtxRef.current = new Ctor!()
+      if (Ctor) audioCtxRef.current = new Ctor() // some WebKit builds ship no Web Audio
       // First audio gesture of the session — warm the recordings so the first
       // timer alarm plays instantly.
       preloadTimerSounds()

@@ -13,7 +13,7 @@ interface FocusModeProps {
   dateStr: string
   programWeek: number
   audioCtx: AudioContext | null
-  onAudioCtxInit: () => AudioContext
+  onAudioCtxInit: () => AudioContext | null
   onClose: () => void
   readOnly?: boolean
   muted: boolean
