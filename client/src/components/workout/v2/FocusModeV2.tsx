@@ -3,6 +3,7 @@ import { useStore } from '../../../store/store'
 import { sendProxyLog } from '../../../store/persistence'
 import { useTestMode } from '../../../store/testMode'
 import { repTargetFor, exerciseRepBand, suggestNextWeight, keyToDate, loggedExerciseIds } from '@letsgetbuff/shared'
+import { useWakeLock } from '../../../lib/audioUnlock'
 import type { ExerciseDef, ExerciseEntry, SetEntry, Session } from '@letsgetbuff/shared'
 import TestModeBanner from '../../TestModeBanner'
 import { SessionTimer, VideoPanel } from '../timers'
@@ -46,6 +47,7 @@ interface FocusModeV2Props {
 }
 
 export default function FocusModeV2(props: FocusModeV2Props) {
+  useWakeLock(true) // keep the screen on mid-workout (iOS locks kill the timers)
   const {
     exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose, readOnly,
     muted, restDefaultSecs, sessionId, workoutType, username, partnerName, partnerState,

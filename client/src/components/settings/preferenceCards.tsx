@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTestMode } from '../../store/testMode'
 import { useUiVersion } from '../../store/uiVersion'
 import { TIMER_SOUNDS, getTimerSound, setTimerSound, playTimerEnd, preloadTimerSounds, type TimerSound } from '../../lib/sounds'
+import { unlockAudio } from '../../lib/audioUnlock'
 
 const REST_SECS_KEY = 'letsgetbuff-rest-secs'
 const REST_SECS_DEFAULT = 90
@@ -61,6 +62,7 @@ export function TimerSoundCard() {
     const Ctor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!Ctor) return
     const ctx = new Ctor()
+    unlockAudio(ctx) // iOS: also unlocks the <audio> elements the alarms use
     playTimerEnd(ctx, s)
     setTimeout(() => ctx.close().catch(() => {}), 2500)
   }

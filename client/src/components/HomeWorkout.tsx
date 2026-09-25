@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../store/store'
+import { useWakeLock } from '../lib/audioUnlock'
 import { useCountdown } from './CountdownTimer'
 import { dateKey, homeWorkoutSteps, homeWorkoutMinutes, HOME_WORKOUT } from '@letsgetbuff/shared'
 import type { HomeStep, StretchLevelId } from '@letsgetbuff/shared'
@@ -51,6 +52,7 @@ export default function HomeWorkout({ audioCtx, muted, levels, onClose }: {
   onClose: () => void
 }) {
   const { dispatch } = useStore()
+  useWakeLock(true) // keep the screen on mid-circuit (iOS locks kill the timers)
   const steps = homeWorkoutSteps(HOME_WORKOUT, ex => levels[ex.id] ?? 1)
   const [idx, setIdx] = useState(0)
   const [finished, setFinished] = useState(false)

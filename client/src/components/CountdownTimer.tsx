@@ -1,6 +1,6 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useEinkMode } from '../store/einkMode'
-import { playTimerEnd } from '../lib/sounds'
+import { playTimerEndResilient } from '../lib/sounds'
 
 // Shared countdown engine + overlay, extracted from the three near-identical
 // timers that used to live inline (RestTimer, ExerciseTimer in WorkoutView and
@@ -73,7 +73,7 @@ export function useCountdown(opts: UseCountdownOpts): Countdown {
           const { audioCtx: ctx, muted: m, resolveAudioCtx: resolve, onComplete: done } = dingRef.current
           if (!m) {
             const resolved = ctx ?? resolve?.() ?? null
-            if (resolved) playTimerEnd(resolved)
+            if (resolved) playTimerEndResilient(resolved)
           }
           if (navigator.vibrate) navigator.vibrate([200, 100, 200])
           done?.(totalRef.current)

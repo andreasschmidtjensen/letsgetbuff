@@ -4,6 +4,7 @@ import { useEinkMode } from '../store/einkMode'
 import YouTubeEmbed from '../components/YouTubeEmbed'
 import { useCountdown } from '../components/CountdownTimer'
 import { preloadTimerSounds } from '../lib/sounds'
+import { unlockAudio, useWakeLock } from '../lib/audioUnlock'
 import { dateKey } from '@letsgetbuff/shared'
 import {
   getSessionStretches, getStretchLevel,
@@ -169,6 +170,7 @@ function StretchFocus({ stretches, startIndex, dateStr, audioCtx, muted, onClose
   audioCtx: AudioContext | null; muted: boolean; onClose: (finished: boolean) => void
 }) {
   const [idx, setIdx] = useState(startIndex)
+  useWakeLock(true) // keep the screen on mid-session (iOS locks kill the timers)
   const cur = stretches[idx]
   const isLast = idx >= stretches.length - 1
   const prevKind = idx > 0 ? stretches[idx - 1].kind : null
@@ -235,6 +237,7 @@ export default function StretchView() {
       const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
       if (Ctor) audioCtxRef.current = new Ctor()
     }
+    unlockAudio(audioCtxRef.current) // iOS: resume + in-gesture element unlock
     return audioCtxRef.current
   }
 

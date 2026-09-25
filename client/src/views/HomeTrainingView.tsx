@@ -3,6 +3,7 @@ import { useStore } from '../store/store'
 import HomeWorkout from '../components/HomeWorkout'
 import YouTubeEmbed from '../components/YouTubeEmbed'
 import { preloadTimerSounds } from '../lib/sounds'
+import { unlockAudio } from '../lib/audioUnlock'
 import {
   dateKey, homeWorkoutMinutes, HOME_WORKOUT, getHomeLevel,
   explainHomeLevel, describeHomeLevel,
@@ -92,6 +93,7 @@ export default function HomeTrainingView() {
       const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
       if (Ctor) audioCtxRef.current = new Ctor()
     }
+    unlockAudio(audioCtxRef.current) // iOS: resume + in-gesture element unlock
     setRunning(true)
   }
 

@@ -19,6 +19,7 @@ import { useStore } from '../store/store'
 import { useLiveOrder } from '../store/useLiveOrder'
 import { isGuestMode } from '../store/guest'
 import { preloadTimerSounds } from '../lib/sounds'
+import { unlockAudio } from '../lib/audioUnlock'
 import StartSessionModal from '../components/StartSessionModal'
 import { START_WARMUP_FLAG } from './StretchView'
 import { parseWarmup } from '../components/workout/helpers'
@@ -101,6 +102,9 @@ export default function WorkoutView({ username, level, onNavigate }: { username:
       // timer alarm plays instantly.
       preloadTimerSounds()
     }
+    // Every call lands inside a user gesture: resume + unlock for iOS, where a
+    // context suspends on screen lock and elements need one in-gesture play.
+    unlockAudio(audioCtxRef.current)
     return audioCtxRef.current
   }, [])
 

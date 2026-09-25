@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { playTimerEnd } from '../../../lib/sounds'
+import { playTimerEndResilient } from '../../../lib/sounds'
 
 /**
  * The two-lane rest engine. One lane per person resting, or a single merged
@@ -121,7 +121,7 @@ export function useRestLanes({ muted, audioCtx, resolveAudioCtx }: UseRestLanesO
           const { muted: m, audioCtx: ctx, resolveAudioCtx: resolve } = dingRef.current
           if (!m) {
             const resolved = ctx ?? resolve?.() ?? null
-            if (resolved) playTimerEnd(resolved)
+            if (resolved) playTimerEndResilient(resolved)
           }
           if (navigator.vibrate) navigator.vibrate([200, 100, 200])
         }

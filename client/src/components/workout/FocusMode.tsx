@@ -5,6 +5,7 @@ import TestModeBanner from '../TestModeBanner'
 import { WarmupCard } from './timers'
 import { ExerciseLogger } from './ExerciseLogger'
 import { exerciseDoneIn, WarmupStep } from './helpers'
+import { useWakeLock } from '../../lib/audioUnlock'
 
 interface FocusModeProps {
   exercises: ExerciseDef[]
@@ -32,6 +33,7 @@ interface FocusModeProps {
 const WARMUP_SLIDE = '__warmup__'
 
 export default function FocusMode({ exercises, startIndex, dateStr, programWeek, audioCtx, onAudioCtxInit, onClose, readOnly, muted, restDefaultSecs, sessionId, workoutType, partnerName, partnerState, refreshPartner, sendPresence, warmup }: FocusModeProps) {
+  useWakeLock(true) // keep the screen on mid-workout (iOS locks kill the timers)
   const { state } = useStore()
   // Slides = optional warm-up steps + the plan exercises, navigated by id so a
   // live reorder can't teleport us.

@@ -5,6 +5,7 @@ import { useUiVersion } from '../store/uiVersion'
 import TodayCardV2, { WeekCell } from '../components/workout/v2/TodayCardV2'
 import HomeWorkout from '../components/HomeWorkout'
 import { preloadTimerSounds } from '../lib/sounds'
+import { unlockAudio } from '../lib/audioUnlock'
 import { computeProgramWeek, phaseFor, scheduleFor, isoWeekKey, weekKeyToMonday, todayDayName, activityLabel, DayActivity, homeWorkoutMinutes, HOME_WORKOUT, suggestHomeLevel } from '@letsgetbuff/shared'
 import { dateKey, keyToDate, addDays } from '@letsgetbuff/shared'
 import type { Tab, Session, ActivityEntry, ActivityType } from '@letsgetbuff/shared'
@@ -155,6 +156,7 @@ export default function HomeView({ onNavigate }: { onNavigate: (tab: Tab) => voi
       const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
       if (Ctor) audioCtxRef.current = new Ctor()
     }
+    unlockAudio(audioCtxRef.current) // iOS: resume + in-gesture element unlock
     setHomeWorkoutOpen(true)
   }
 
