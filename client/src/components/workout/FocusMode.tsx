@@ -6,6 +6,7 @@ import { WarmupCard } from './timers'
 import { ExerciseLogger } from './ExerciseLogger'
 import { exerciseDoneIn, WarmupStep } from './helpers'
 import { useWakeLock } from '../../lib/audioUnlock'
+import { useOpenBugReport } from '../../store/bugReport'
 
 interface FocusModeProps {
   exercises: ExerciseDef[]
@@ -41,6 +42,7 @@ export default function FocusMode({ exercises, startIndex, dateStr, programWeek,
   const warmupIds = warmupSteps.map((_, i) => `${WARMUP_SLIDE}${i}`)
   const slides = [...warmupIds, ...exercises.map(e => e.id)]
   const [currentId, setCurrentId] = useState(slides[Math.min(Math.max(startIndex, 0), slides.length - 1)] ?? slides[0])
+  const openBugReport = useOpenBugReport()
   const [warmupsDone, setWarmupsDone] = useState<boolean[]>(() => warmupSteps.map(() => false))
 
   let idx = slides.indexOf(currentId)
@@ -80,6 +82,9 @@ export default function FocusMode({ exercises, startIndex, dateStr, programWeek,
         <div className="focus-progress-bar" aria-hidden="true">
           <div className="focus-progress-fill" style={{ width: `${((idx + 1) / slides.length) * 100}%` }} />
         </div>
+        {openBugReport && (
+          <button className="btn btn-secondary btn-sm" onClick={openBugReport} title="Report a bug" aria-label="Report a bug">🐛</button>
+        )}
       </div>
 
       <div className="focus-body">

@@ -4,6 +4,7 @@ import { sendProxyLog } from '../../../store/persistence'
 import { useTestMode } from '../../../store/testMode'
 import { repTargetFor, exerciseRepBand, suggestNextWeight, keyToDate, loggedExerciseIds } from '@letsgetbuff/shared'
 import { useWakeLock } from '../../../lib/audioUnlock'
+import { useOpenBugReport } from '../../../store/bugReport'
 import type { ExerciseDef, ExerciseEntry, SetEntry, Session } from '@letsgetbuff/shared'
 import TestModeBanner from '../../TestModeBanner'
 import { SessionTimer, VideoPanel } from '../timers'
@@ -62,6 +63,7 @@ export default function FocusModeV2(props: FocusModeV2Props) {
     exercises[Math.min(Math.max(startIndex, 0), exercises.length - 1)]?.id ?? exercises[0]?.id,
   )
   const [showVideo, setShowVideo] = useState(false)
+  const openBugReport = useOpenBugReport()
   const [partnerOpen, setPartnerOpen] = useState(false)
   const [targetLane, setTargetLane] = useState<string | null>(null)
   // Optimistic partner sets + the reason a proxy write failed. Both are scoped to
@@ -200,6 +202,9 @@ export default function FocusModeV2(props: FocusModeV2Props) {
           <div className="v2-progress-fill" style={{ width: `${((idx + 1) / exercises.length) * 100}%` }} />
         </div>
         {sessionStartedAt != null && <SessionTimer startedAt={sessionStartedAt} />}
+        {openBugReport && (
+          <button className="v2-header-btn" onClick={openBugReport} title="Report a bug" aria-label="Report a bug">🐛</button>
+        )}
         <UiVersionChip />
       </div>
 

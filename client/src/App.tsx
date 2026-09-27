@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { StoreProvider } from './store/store'
 import { TestModeProvider } from './store/testMode'
 import { EinkModeProvider, useEinkMode } from './store/einkMode'
@@ -19,6 +19,7 @@ import GuestBanner from './components/GuestBanner'
 import { isGuestMode, setGuestMode, GUEST_USERNAME } from './store/guest'
 import ErrorBoundary from './components/ErrorBoundary'
 import BugReportModal from './components/BugReportModal'
+import { BugReportContext } from './store/bugReport'
 import VersionBadge from './components/VersionBadge'
 import './app.css'
 
@@ -92,8 +93,10 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
   const [bugReportOpen, setBugReportOpen] = useState(false)
   const { einkMode, setEinkMode } = useEinkMode()
   const guest = isGuestMode()
+  const openBugReport = useCallback(() => setBugReportOpen(true), [])
 
   return (
+    <BugReportContext.Provider value={guest ? null : openBugReport}>
     <div className="app">
       {guest ? <GuestBanner onExit={onLogout} /> : <TestModeBanner />}
       <header className="app-header">
@@ -157,6 +160,7 @@ function AppInner({ username, level, onLogout }: { username: string; level: Priv
         ))}
       </nav>
     </div>
+    </BugReportContext.Provider>
   )
 }
 
